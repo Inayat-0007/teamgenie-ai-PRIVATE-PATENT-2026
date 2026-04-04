@@ -8,11 +8,15 @@ from __future__ import annotations
 import os
 import traceback
 
-import structlog
+try:
+    import structlog
+    logger = structlog.get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
-
-logger = structlog.get_logger(__name__)
 
 _MAX_CONTEXT_LINES = 5  # lines above/below error to extract
 

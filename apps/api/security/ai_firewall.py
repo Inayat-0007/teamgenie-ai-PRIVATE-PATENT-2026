@@ -8,10 +8,14 @@ from __future__ import annotations
 import os
 import re
 
-import structlog
-from fastapi import Request, HTTPException
+try:
+    import structlog
+    logger = structlog.get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
-logger = structlog.get_logger(__name__)
+from fastapi import Request, HTTPException
 
 # Pre-compiled regex for common attack signatures (case-insensitive)
 _ATTACK_PATTERNS: list[re.Pattern] = [

@@ -6,11 +6,15 @@ from __future__ import annotations
 
 import traceback
 
-import structlog
+try:
+    import structlog
+    logger = structlog.get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
-
-logger = structlog.get_logger(__name__)
 
 
 async def error_handler_middleware(request: Request, call_next):

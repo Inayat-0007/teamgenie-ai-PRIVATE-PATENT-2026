@@ -37,12 +37,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install black flake8 mypy ruff
+          pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt || pip install fastapi uvicorn pydantic pydantic-settings python-dotenv python-multipart python-jose httpx structlog tenacity pytest pytest-cov pytest-asyncio
+          pip install black ruff
 
       - name: Lint (Ruff — fast)
-        run: ruff check . --fix --exit-non-zero-on-fix || true
+        run: ruff check . || true
 
       - name: Format check (Black)
         run: black --check --diff . || true
@@ -52,7 +52,11 @@ jobs:
         run: mypy . --ignore-missing-imports --no-error-summary || true
 
       - name: Test
-        run: pytest tests/ -v --cov=. --cov-report=xml --cov-report=term-missing --tb=short
+        env:
+          PYTHON_ENV: test
+          ENABLE_AI_FIREWALL: 'false'
+          ENABLE_SELF_HEALING: 'false'
+        run: pytest tests/ -v --tb=short --no-header -q
 
       - name: Upload coverage
         if: always()

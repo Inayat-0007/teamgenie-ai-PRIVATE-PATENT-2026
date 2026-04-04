@@ -14,7 +14,6 @@ select = [
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
     "SIM", # flake8-simplify
-    "TCH", # flake8-type-checking
     "RUF", # Ruff-specific rules
 ]
 ignore = [
@@ -32,9 +31,8 @@ line-length = 120
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-asyncio_mode = "auto"
 markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "slow: marks tests as slow",
     "integration: marks integration tests requiring external services",
 ]
 

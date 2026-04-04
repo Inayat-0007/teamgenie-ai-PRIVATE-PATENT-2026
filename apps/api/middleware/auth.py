@@ -8,11 +8,20 @@ from __future__ import annotations
 import os
 import time
 
-import structlog
-from fastapi import Request, HTTPException
-from jose import jwt, JWTError
+try:
+    import structlog
+    logger = structlog.get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
-logger = structlog.get_logger(__name__)
+from fastapi import Request, HTTPException
+
+try:
+    from jose import jwt, JWTError
+except ImportError:
+    jwt = None  # type: ignore[assignment]
+    JWTError = Exception  # type: ignore[misc,assignment]
 
 # Public routes that bypass authentication
 PUBLIC_ROUTES: frozenset[str] = frozenset({
@@ -35,8 +44,8 @@ async def verify_jwt(request: Request, call_next):
     auth_header = request.headers.get("Authorization")
 
     if not auth_header or not auth_header.startswith("Bearer "):
-        # Allow unauthenticated access in development mode
-        if os.getenv("PYTHON_ENV") == "development":
+        # Allow unauthenticated access in development/test mode
+        if os.getenv("PYTHON_ENV") in ("development", "test"):
             request.state.user_id = "dev_user"
             request.state.user_role = "authenticated"
             request.state.user_tier = "free"

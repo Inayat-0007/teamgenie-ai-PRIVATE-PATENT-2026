@@ -6,13 +6,14 @@ from __future__ import annotations
 
 import os
 
+# Force safe test mode BEFORE any app imports
+os.environ["PYTHON_ENV"] = "test"
+os.environ["ENABLE_AI_FIREWALL"] = "false"
+os.environ["ENABLE_SELF_HEALING"] = "false"
+os.environ["SUPABASE_JWT_SECRET"] = "test-jwt-secret-for-ci"
+
 import pytest
 from fastapi.testclient import TestClient
-
-# Force development mode for tests
-os.environ.setdefault("PYTHON_ENV", "development")
-os.environ.setdefault("ENABLE_AI_FIREWALL", "false")
-os.environ.setdefault("ENABLE_SELF_HEALING", "false")
 
 from main import app  # noqa: E402 — must import after env setup
 
