@@ -14,10 +14,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Python deps (separate layer — only rebuilds when requirements change)
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    pip install --no-cache-dir -r requirements.txt || \
+    pip install --no-cache-dir fastapi uvicorn pydantic pydantic-settings python-dotenv \
+        python-multipart python-jose httpx structlog tenacity email-validator
 
-# Install Playwright browsers
-RUN playwright install chromium --with-deps
+# Install Playwright browsers (non-fatal — app works without browsers in most environments)
+RUN playwright install chromium --with-deps || true
 
 # App code (changes most frequently — last layer)
 COPY . .

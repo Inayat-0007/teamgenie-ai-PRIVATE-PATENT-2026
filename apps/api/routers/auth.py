@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 try:
+    import email_validator  # noqa: F401 — verify email-validator is installed before using EmailStr
     from pydantic import EmailStr
 except ImportError:
     EmailStr = str  # type: ignore[misc,assignment]
