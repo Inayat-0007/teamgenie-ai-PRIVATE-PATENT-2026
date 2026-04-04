@@ -1,8 +1,20 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { WSMessage, LiveScore } from '@teamgenie/shared';
-import { WS_BASE_URL } from '@teamgenie/shared';
+
+// --- Local types (avoids @teamgenie/shared dependency resolution) ---
+interface WSMessage<T = unknown> {
+  readonly type: 'score_update' | 'player_update' | 'match_status' | 'heartbeat';
+  readonly payload: T;
+  readonly timestamp: number;
+}
+
+const WS_BASE_URL =
+  process.env.NEXT_PUBLIC_WS_URL ||
+  (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace('http', 'ws');
+
+const API_TIMEOUT_MS = 30_000;
+const API_RETRY_COUNT = 3;
 
 interface UseWebSocketOptions {
   matchId: string;
@@ -117,4 +129,5 @@ export function useWebSocket({
   return { isConnected, lastMessage, reconnectCount, send, disconnect };
 }
 
+export type { WSMessage, UseWebSocketOptions, UseWebSocketReturn };
 export default useWebSocket;
