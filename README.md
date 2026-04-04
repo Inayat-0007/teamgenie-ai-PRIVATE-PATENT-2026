@@ -83,6 +83,18 @@ graph TD
 
 ---
 
+## 🎬 Deep Dive: Inayat Developer Media
+
+If you want to truly understand the mental models, architectural decisions, and visual interface flow that built this, I have created a deep-dive media folder specifically for you.
+
+Inside the **`inayat DEVELOPER media`** directory at the root of this repository, you will find:
+- 📀 **`TUTORIAL VIDEO.mp4` & `TUTORIAL VIDEO 2.mp4`**: Hands-on walkthroughs of the codebase and system operations.
+- 📘 **`TeamGenie_AI_Playbook.pdf`**: The official playbook documentation detailing the system mechanics and vision.
+- 🖼️ **`THUMBNIL.png`**: High-resolution project thumbnail.
+
+👉 [**Click here to explore the Developer Media Folder**](https://github.com/Inayat-0007/teamgenie-ai-PRIVATE-PATENT-2026/tree/main/inayat%20DEVELOPER%20media)
+
+---
 ## 🏗️ Repository Anatomy
 
 I've structured this using **Turborepo**. It is the absolute best practice for massive TypeScript/Python hybrid projects, allowing us to share types and configurations instantly across applications.
