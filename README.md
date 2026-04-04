@@ -1,5 +1,10 @@
 <div align="center">
 
+  <a href="https://github.com/Inayat-0007/teamgenie-ai-PRIVATE-PATENT-2026">
+    <img src="inayat%20DEVELOPER%20media/THUMBNIL.png" alt="TeamGenie AI Architecture & Vision" width="100%">
+  </a>
+  <br>
+
   <h1>TeamGenie AI 🧞‍♂️</h1>
   <p><strong>A Hyper-Optimized, Multi-Agent Fantasy Sports Intelligence Framework.</strong></p>
   
