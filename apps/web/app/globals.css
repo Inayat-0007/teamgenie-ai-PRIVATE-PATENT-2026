@@ -16,22 +16,35 @@
   padding: 0;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Glassmorphism card */
+/* ========================================
+   Glassmorphism card
+   ======================================== */
 .glass-card {
   background: rgba(255, 255, 255, 0.05);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
+  transition: box-shadow 0.3s ease;
 }
 
-/* Gradient text */
+.glass-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* ========================================
+   Gradient text
+   ======================================== */
 .gradient-text {
   background: linear-gradient(135deg, #6366f1, #22d3ee, #a855f7);
   -webkit-background-clip: text;
@@ -39,12 +52,18 @@ body {
   background-clip: text;
 }
 
-/* Glow effect */
+/* ========================================
+   Glow effect
+   ======================================== */
 .glow {
-  box-shadow: 0 0 40px rgba(99, 102, 241, 0.15), 0 0 80px rgba(34, 211, 238, 0.1);
+  box-shadow:
+    0 0 40px rgba(99, 102, 241, 0.15),
+    0 0 80px rgba(34, 211, 238, 0.1);
 }
 
-/* Subtle pulse for live indicators */
+/* ========================================
+   Subtle pulse for live indicators
+   ======================================== */
 @keyframes pulse-glow {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
@@ -54,7 +73,45 @@ body {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
-/* Smooth scrollbar */
+/* ========================================
+   Shimmer loading skeleton
+   ======================================== */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 8px;
+}
+
+/* ========================================
+   Focus styles (a11y)
+   ======================================== */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ========================================
+   Selection color
+   ======================================== */
+::selection {
+  background: rgba(99, 102, 241, 0.3);
+  color: #fff;
+}
+
+/* ========================================
+   Smooth scrollbar (dark theme)
+   ======================================== */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
@@ -62,3 +119,23 @@ body {
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.3); }
+
+/* Firefox scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+/* ========================================
+   Reduced motion (a11y)
+   ======================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

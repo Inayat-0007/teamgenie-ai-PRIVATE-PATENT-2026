@@ -1,0 +1,47 @@
+# TeamGenie AI — Python Linting Configuration
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "RUF", # Ruff-specific rules
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults (FastAPI Depends)
+    "B904",   # raise from within except
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["apps", "packages", "services", "routers", "middleware", "models", "db"]
+
+[tool.black]
+target-version = ["py311"]
+line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks integration tests requiring external services",
+]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+disallow_untyped_defs = false
+check_untyped_defs = true

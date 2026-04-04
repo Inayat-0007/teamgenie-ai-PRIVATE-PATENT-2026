@@ -1,10 +1,8 @@
 # ============================================================
 # TeamGenie AI — Local Development Environment
-# Usage: docker-compose up -d
+# Usage: docker compose up -d
 # Docs: docs/guides/LOCAL_DEVELOPMENT.md
 # ============================================================
-
-version: '3.9'
 
 services:
   # ==========================================
@@ -14,6 +12,7 @@ services:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
+      target: base
     container_name: teamgenie-api
     ports:
       - "8000:8000"
@@ -24,8 +23,10 @@ services:
       - ./apps/api/.env
     environment:
       - PYTHON_ENV=development
-      - API_RELOAD=true
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+      - UPSTASH_REDIS_URL=redis://:teamgenie_dev_redis@redis:6379
+      - ENABLE_AI_FIREWALL=false
+      - ENABLE_SELF_HEALING=false
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload --log-level info
     depends_on:
       redis:
         condition: service_healthy
@@ -33,12 +34,13 @@ services:
         condition: service_healthy
     networks:
       - teamgenie-network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
 
   # ==========================================
   # FRONTEND (Next.js)
@@ -54,16 +56,15 @@ services:
       - ./apps/web:/app
       - /app/node_modules
       - /app/.next
-    env_file:
-      - ./apps/web/.env.local
     environment:
       - NODE_ENV=development
       - NEXT_PUBLIC_API_URL=http://localhost:8000
-    command: bun dev
+    command: npm run dev
     depends_on:
       - api
     networks:
       - teamgenie-network
+    restart: unless-stopped
 
   # ==========================================
   # REDIS (Cache — local replacement for Upstash)
@@ -75,20 +76,21 @@ services:
       - "6379:6379"
     volumes:
       - redis-data:/data
-    command: redis-server --appendonly yes --requirepass teamgenie_dev_redis
+    command: redis-server --appendonly yes --requirepass teamgenie_dev_redis --maxmemory 256mb --maxmemory-policy allkeys-lru
     networks:
       - teamgenie-network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "teamgenie_dev_redis", "ping"]
-      interval: 30s
-      timeout: 10s
+      interval: 15s
+      timeout: 5s
       retries: 3
 
   # ==========================================
   # POSTGRES (local replacement for Supabase)
   # ==========================================
   postgres:
-    image: postgres:15-alpine
+    image: postgres:16-alpine
     container_name: teamgenie-postgres
     ports:
       - "5432:5432"
@@ -98,14 +100,15 @@ services:
       POSTGRES_PASSWORD: local_dev_password_change_in_prod
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./db/migrations/001_initial_schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     networks:
       - teamgenie-network
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U teamgenie"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      test: ["CMD-SHELL", "pg_isready -U teamgenie -d teamgenie_dev"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
 
   # ==========================================
   # ADMINER (Database GUI)
@@ -117,10 +120,14 @@ services:
       - "8080:8080"
     environment:
       ADMINER_DEFAULT_SERVER: postgres
+      ADMINER_DESIGN: dracula
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     networks:
       - teamgenie-network
+    profiles:
+      - debug
 
   # ==========================================
   # MAILHOG (Email Testing)
@@ -133,6 +140,8 @@ services:
       - "8025:8025"  # Web UI
     networks:
       - teamgenie-network
+    profiles:
+      - debug
 
   # ==========================================
   # QDRANT (Vector DB — local replacement for Pinecone)
@@ -145,13 +154,34 @@ services:
       - "6334:6334"  # gRPC
     volumes:
       - qdrant-data:/qdrant/storage
+    environment:
+      QDRANT__SERVICE__GRPC_PORT: 6334
     networks:
       - teamgenie-network
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:6333/"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
+
+  # ==========================================
+  # PROMETHEUS (Metrics)
+  # ==========================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: teamgenie-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./monitoring/alerts.yml:/etc/prometheus/alerts.yml
+      - prometheus-data:/prometheus
+    networks:
+      - teamgenie-network
+    profiles:
+      - monitoring
+    restart: unless-stopped
 
 # ==========================================
 # VOLUMES (persistent data)
@@ -162,6 +192,8 @@ volumes:
   postgres-data:
     driver: local
   qdrant-data:
+    driver: local
+  prometheus-data:
     driver: local
 
 # ==========================================

@@ -1,75 +1,78 @@
 # ============================================
 # TeamGenie AI — Python Dependencies
 # Install: pip install -r requirements.txt
+# Pinned to compatible ranges for reproducibility
 # ============================================
 
 # --- Core Framework ---
-fastapi
-uvicorn[standard]
-pydantic
-pydantic-settings
-python-dotenv
-python-multipart
+fastapi>=0.110,<1.0
+uvicorn[standard]>=0.27,<1.0
+pydantic>=2.5,<3.0
+pydantic-settings>=2.1,<3.0
+python-dotenv>=1.0
+python-multipart>=0.0.6
 
 # --- Authentication ---
-python-jose[cryptography]
-passlib[bcrypt]
-httpx
+python-jose[cryptography]>=3.3
+passlib[bcrypt]>=1.7
+httpx>=0.26,<1.0
 
 # --- Databases ---
-libsql-client
-supabase
-pinecone-client
+libsql-client>=0.3
+supabase>=2.3,<3.0
+pinecone-client>=3.0,<4.0
 
 # --- Cache ---
-upstash-redis
-redis
+upstash-redis>=1.0
+redis>=5.0,<6.0
 
 # --- AI / LLM ---
-langchain
-langchain-google-genai
-langchain-anthropic
-langchain-community
-crewai
-google-generativeai
-anthropic
-openai
-cohere
+langchain>=0.1,<1.0
+langchain-google-genai>=0.0.6
+langchain-anthropic>=0.1
+langchain-community>=0.0.10
+crewai>=0.28
+google-generativeai>=0.4
+anthropic>=0.18
+openai>=1.10
+cohere>=4.40
 
 # --- RAG ---
-sentence-transformers
-llama-index
+sentence-transformers>=2.3,<3.0
+llama-index>=0.10
 
 # --- Scraping ---
-playwright
-beautifulsoup4
-jina
+playwright>=1.40
+beautifulsoup4>=4.12
 
 # --- Optimization ---
-ortools
+ortools>=9.8
 
 # --- Monitoring ---
-sentry-sdk[fastapi]
-posthog
-opentelemetry-api
-opentelemetry-sdk
-opentelemetry-instrumentation-fastapi
+sentry-sdk[fastapi]>=1.40
+posthog>=3.3
+opentelemetry-api>=1.22
+opentelemetry-sdk>=1.22
+opentelemetry-instrumentation-fastapi>=0.43b0
 
 # --- Data Processing ---
-numpy
-pandas
-scikit-learn
+numpy>=1.26,<2.0
+pandas>=2.1,<3.0
+scikit-learn>=1.3
 
 # --- Security ---
-cryptography
+cryptography>=42.0
 
 # --- Testing ---
-pytest
-pytest-asyncio
-pytest-cov
-httpx
+pytest>=7.4
+pytest-asyncio>=0.23
+pytest-cov>=4.1
+ruff>=0.2
 
 # --- Utilities ---
-python-dateutil
-tenacity
-structlog
+python-dateutil>=2.8
+tenacity>=8.2
+structlog>=24.1
+
+# --- Type Checking ---
+mypy>=1.8

@@ -4,6 +4,11 @@
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
+  scrape_timeout: 10s
+
+  external_labels:
+    environment: production
+    service: teamgenie
 
 rule_files:
   - "alerts.yml"
@@ -11,14 +16,38 @@ rule_files:
 scrape_configs:
   - job_name: "teamgenie-api"
     static_configs:
-      - targets: ["localhost:8000"]
+      - targets: ["api:8000"]
+        labels:
+          app: teamgenie
+          component: api
     metrics_path: /metrics
     scrape_interval: 10s
 
   - job_name: "redis"
     static_configs:
-      - targets: ["redis:6379"]
+      - targets: ["redis-exporter:9121"]
+        labels:
+          app: teamgenie
+          component: cache
+
+  - job_name: "postgres"
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+        labels:
+          app: teamgenie
+          component: database
 
   - job_name: "node-exporter"
     static_configs:
       - targets: ["node-exporter:9100"]
+        labels:
+          app: teamgenie
+          component: infrastructure
+
+  - job_name: "qdrant"
+    static_configs:
+      - targets: ["qdrant:6333"]
+        labels:
+          app: teamgenie
+          component: vectordb
+    metrics_path: /metrics

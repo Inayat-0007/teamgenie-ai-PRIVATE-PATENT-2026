@@ -1,37 +1,171 @@
 # TeamGenie AI — Alert Rules
+# Prometheus alerting rules for production reliability
 
 groups:
-  - name: teamgenie-alerts
+  # ==========================================
+  # Availability Alerts
+  # ==========================================
+  - name: availability
     rules:
-      - alert: HighErrorRate
-        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
-        for: 5m
-        labels:
-          severity: critical
-        annotations:
-          summary: "High error rate detected (>5%)"
-          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
-
-      - alert: HighLatency
-        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1.0
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "High API latency (p95 > 1s)"
-
       - alert: APIDown
         expr: up{job="teamgenie-api"} == 0
         for: 1m
         labels:
           severity: critical
+          team: backend
         annotations:
           summary: "TeamGenie API is DOWN"
+          description: "API has been unreachable for over 1 minute."
+          runbook: "1. Check Render dashboard. 2. Check pod logs. 3. Verify health endpoint."
 
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "High error rate detected (>5%)"
+          description: "Error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      - alert: HighErrorRateWarning
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.02
+        for: 10m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "Elevated error rate (>2%)"
+
+  # ==========================================
+  # Latency Alerts
+  # ==========================================
+  - name: latency
+    rules:
+      - alert: HighLatencyP95
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1.0
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High API latency (p95 > 1s)"
+          description: "95th percentile latency is {{ $value }}s."
+
+      - alert: CriticalLatencyP99
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m])) > 5.0
+        for: 3m
+        labels:
+          severity: critical
+          team: backend
+        annotations:
+          summary: "Critical API latency (p99 > 5s)"
+          description: "99th percentile latency is {{ $value }}s — exceeds 5s SLA."
+
+      - alert: TeamGenerationSlow
+        expr: histogram_quantile(0.95, rate(team_generation_duration_seconds_bucket[5m])) > 5.0
+        for: 5m
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "AI team generation exceeding 5s target"
+          description: "p95 generation time is {{ $value }}s."
+
+  # ==========================================
+  # Resource Alerts
+  # ==========================================
+  - name: resources
+    rules:
       - alert: HighMemoryUsage
         expr: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.9
         for: 5m
         labels:
           severity: warning
+          team: infra
         annotations:
           summary: "Memory usage above 90%"
+
+      - alert: HighCPUUsage
+        expr: rate(container_cpu_usage_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "CPU usage above 80% for 10 minutes"
+
+      - alert: DiskSpaceLow
+        expr: node_filesystem_avail_bytes / node_filesystem_size_bytes < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "Disk space below 10%"
+
+  # ==========================================
+  # Business Metrics
+  # ==========================================
+  - name: business
+    rules:
+      - alert: NoTeamsGenerated
+        expr: rate(teams_generated_total[30m]) == 0
+        for: 30m
+        labels:
+          severity: warning
+          team: product
+        annotations:
+          summary: "No teams generated in past 30 minutes"
+          description: "Possible issue with AI pipeline or no traffic."
+
+      - alert: LowPredictionAccuracy
+        expr: prediction_accuracy_rate < 0.5
+        for: 1h
+        labels:
+          severity: warning
+          team: ai
+        annotations:
+          summary: "Prediction accuracy dropped below 50%"
+
+      - alert: HighRateLimitHits
+        expr: rate(rate_limit_exceeded_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: backend
+        annotations:
+          summary: "High rate of 429 responses (>10/5min)"
+          description: "May indicate abuse or DDoS."
+
+  # ==========================================
+  # Cache & Database
+  # ==========================================
+  - name: data-stores
+    rules:
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "Redis is unreachable"
+
+      - alert: RedisHighMemory
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          team: infra
+        annotations:
+          summary: "Redis memory usage above 85%"
+
+      - alert: PostgresDown
+        expr: up{job="postgres"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          team: infra
+        annotations:
+          summary: "Postgres is unreachable"

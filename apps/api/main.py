@@ -3,72 +3,109 @@ TeamGenie AI — FastAPI Backend
 Production-grade async API with self-healing middleware.
 """
 
+from __future__ import annotations
+
+import os
+import time
+import uuid
+from contextlib import asynccontextmanager
+from typing import Final
+
+import sentry_sdk
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from contextlib import asynccontextmanager
-import time
-import os
-import sentry_sdk
 
-from routers import auth, team, player, match, user
-from middleware.rate_limit import RateLimitMiddleware
+from middleware.auth import verify_jwt
 from middleware.error_handler import error_handler_middleware
+from middleware.rate_limit import rate_limit_middleware
+from middleware.self_healing import self_healing_middleware
+from routers import auth, match, player, team, user
+from security.ai_firewall import ai_firewall_check
 
-# Sentry (error tracking)
-if os.getenv("SENTRY_DSN"):
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+API_VERSION: Final[str] = "1.0.0"
+
+logger = structlog.get_logger(__name__)
+
+# ---------------------------------------------------------------------------
+# Sentry — error tracking (guarded)
+# ---------------------------------------------------------------------------
+_sentry_dsn = os.getenv("SENTRY_DSN")
+if _sentry_dsn:
     sentry_sdk.init(
-        dsn=os.getenv("SENTRY_DSN"),
+        dsn=_sentry_dsn,
         traces_sample_rate=float(os.getenv("SENTRY_TRACES_SAMPLE_RATE", "0.1")),
         environment=os.getenv("SENTRY_ENVIRONMENT", "development"),
     )
 
 
+# ---------------------------------------------------------------------------
+# Lifespan — startup / shutdown hooks
+# ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
-    print("🚀 Starting TeamGenie API v1.0.0...")
-    # Startup: init connections
+    logger.info("api.starting", version=API_VERSION)
+
+    # Startup — warm connections
     from services.cache_service import CacheService
-    app.state.cache = CacheService()
-    await app.state.cache.connect()
-    print("✅ Redis connected")
-    print("✅ Ready to serve requests")
+
+    cache = CacheService()
+    try:
+        await cache.connect()
+        app.state.cache = cache
+        logger.info("redis.connected")
+    except Exception as exc:
+        logger.warning("redis.connect_failed", error=str(exc))
+        app.state.cache = cache  # still assign so code doesn't crash
+
+    logger.info("api.ready")
     yield
+
     # Shutdown
-    print("👋 Shutting down gracefully...")
-    await app.state.cache.disconnect()
+    logger.info("api.shutting_down")
+    if hasattr(app.state, "cache") and app.state.cache:
+        await app.state.cache.disconnect()
 
 
+# ---------------------------------------------------------------------------
+# App instance
+# ---------------------------------------------------------------------------
 app = FastAPI(
     title="TeamGenie AI API",
     description="AI-powered fantasy sports intelligence platform",
-    version="1.0.0",
+    version=API_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan,
 )
 
-# --- MIDDLEWARE STACK (order matters!) ---
 
-# 1. CORS
+# ---------------------------------------------------------------------------
+# Middleware stack (execution order is bottom → top)
+# ---------------------------------------------------------------------------
+
+# 1. CORS — outermost
+_allowed_origins = os.getenv(
+    "ALLOWED_ORIGINS", "http://localhost:3000"
+).split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "https://teamgenie.app",
-        "https://www.teamgenie.app",
-        "http://localhost:3000",
-    ],
+    allow_origins=[o.strip() for o in _allowed_origins],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# 2. Request ID + Timing middleware
+# 2. Request ID + timing (decorates every response)
 @app.middleware("http")
 async def add_request_metadata(request: Request, call_next):
-    import uuid
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
     start = time.perf_counter()
@@ -78,14 +115,37 @@ async def add_request_metadata(request: Request, call_next):
     duration_ms = (time.perf_counter() - start) * 1000
     response.headers["X-Request-ID"] = request_id
     response.headers["X-Response-Time"] = f"{duration_ms:.0f}ms"
+
+    logger.debug(
+        "http.request",
+        method=request.method,
+        path=request.url.path,
+        status=response.status_code,
+        duration_ms=round(duration_ms),
+        request_id=request_id,
+    )
     return response
 
 
 # 3. Error handler
 app.middleware("http")(error_handler_middleware)
 
+# 4. Self-healing (experimental)
+app.middleware("http")(self_healing_middleware)
 
-# --- ROUTERS ---
+# 5. Auth — JWT verification
+app.middleware("http")(verify_jwt)
+
+# 6. AI Firewall — block malicious payloads
+app.middleware("http")(ai_firewall_check)
+
+# 7. Rate limiter
+app.middleware("http")(rate_limit_middleware)
+
+
+# ---------------------------------------------------------------------------
+# Routers
+# ---------------------------------------------------------------------------
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(team.router, prefix="/api/team", tags=["Team Generation"])
 app.include_router(player.router, prefix="/api/player", tags=["Player Insights"])
@@ -93,22 +153,34 @@ app.include_router(match.router, prefix="/api/match", tags=["Match Data"])
 app.include_router(user.router, prefix="/api/user", tags=["User Management"])
 
 
-# --- HEALTH CHECK ---
+# ---------------------------------------------------------------------------
+# Health check
+# ---------------------------------------------------------------------------
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {
         "status": "healthy",
-        "version": "1.0.0",
+        "version": API_VERSION,
         "service": "teamgenie-api",
         "timestamp": time.time(),
     }
 
 
-# --- GLOBAL EXCEPTION HANDLER ---
+# ---------------------------------------------------------------------------
+# Global exception handler
+# ---------------------------------------------------------------------------
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    if os.getenv("SENTRY_DSN"):
+    if _sentry_dsn:
         sentry_sdk.capture_exception(exc)
+
+    logger.error(
+        "unhandled_exception",
+        error=str(exc),
+        path=request.url.path,
+        request_id=getattr(request.state, "request_id", "unknown"),
+    )
+
     return JSONResponse(
         status_code=500,
         content={

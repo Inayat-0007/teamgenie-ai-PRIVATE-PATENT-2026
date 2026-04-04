@@ -36,5 +36,5 @@
   "engines": {
     "node": ">=20.0.0"
   },
-  "packageManager": "bun@1.0.25"
+  "packageManager": "npm@10.8.2"
 }
