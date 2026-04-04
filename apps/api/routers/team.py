@@ -14,7 +14,7 @@ except ImportError:
     import logging
     logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional
 
@@ -148,7 +148,7 @@ async def generate_team(
 
 
 @router.get("/history")
-async def team_history(page: int = 1, limit: int = Field(default=20, ge=1, le=100)):
+async def team_history(page: int = 1, limit: int = Query(default=20, ge=1, le=100)):
     """List all teams created by authenticated user."""
     # TODO: Query Turso with pagination
     return {
