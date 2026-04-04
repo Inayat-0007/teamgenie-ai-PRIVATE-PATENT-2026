@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "TeamGenie AI",
+    "slug": "teamgenie-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "teamgenie",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "backgroundColor": "#0f172a",
+      "resizeMode": "contain"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.teamgenie.mobile"
+    },
+    "android": {
+      "adaptiveIcon": { "backgroundColor": "#0f172a" },
+      "package": "app.teamgenie.mobile"
+    },
+    "plugins": ["expo-router"],
+    "experiments": { "typedRoutes": true }
+  }
+}

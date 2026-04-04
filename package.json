@@ -1,0 +1,40 @@
+{
+  "name": "teamgenie-ai",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AI-powered fantasy sports intelligence platform",
+  "author": "Mohammed Inayat Hussain Qureshi <mohammadinayathussain552000@gmail.com>",
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Inayat-0007/teamgenie-ai.git"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "test": "turbo test",
+    "clean": "turbo clean && rm -rf node_modules",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "typecheck": "turbo typecheck",
+    "dev:web": "turbo dev --filter=@teamgenie/web",
+    "dev:api": "cd apps/api && uvicorn main:app --reload --port 8000",
+    "dev:mobile": "turbo dev --filter=@teamgenie/mobile",
+    "db:migrate": "cd apps/api && python -m alembic upgrade head",
+    "db:seed": "cd apps/api && python scripts/seed-db.py"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "prettier": "^3.2.0",
+    "turbo": "^2.0.0",
+    "typescript": "^5.3.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "bun@1.0.25"
+}

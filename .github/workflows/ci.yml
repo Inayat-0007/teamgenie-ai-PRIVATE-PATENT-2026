@@ -1,0 +1,64 @@
+name: CI — Lint, Test, Build
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  # Backend (Python)
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - name: Lint (black + flake8)
+        run: |
+          pip install black flake8
+          black --check .
+          flake8 . --max-line-length=120 --ignore=E501,W503
+      - name: Test
+        run: pytest tests/ -v --cov=. --cov-report=xml
+      - name: Upload coverage
+        uses: codecov/codecov-action@v3
+        with:
+          file: apps/api/coverage.xml
+
+  # Frontend (Next.js)
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v1
+      - run: bun install
+      - name: Lint
+        run: bun run lint
+      - name: Type Check
+        run: bun run typecheck
+      - name: Build
+        run: bun run build
+
+  # Security Scan
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Python dependency audit
+        run: |
+          pip install pip-audit
+          pip-audit -r apps/api/requirements.txt || true
+      - name: Secret scanning
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified

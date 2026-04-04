@@ -1,0 +1,75 @@
+# ============================================
+# TeamGenie AI — Python Dependencies
+# Install: pip install -r requirements.txt
+# ============================================
+
+# --- Core Framework ---
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-dotenv==1.0.0
+python-multipart==0.0.6
+
+# --- Authentication ---
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+httpx==0.26.0
+
+# --- Databases ---
+libsql-client==0.3.0
+supabase==2.2.0
+pinecone-client==3.0.0
+
+# --- Cache ---
+upstash-redis==1.0.0
+redis==5.0.1
+
+# --- AI / LLM ---
+langchain==0.1.4
+langchain-google-genai==0.0.6
+langchain-anthropic==0.1.1
+langchain-community==0.0.12
+crewai==0.1.20
+google-generativeai==0.3.2
+anthropic==0.8.1
+openai==1.10.0
+cohere==4.45
+
+# --- RAG ---
+sentence-transformers==2.3.1
+llama-index==0.10.4
+
+# --- Scraping ---
+playwright==1.41.0
+beautifulsoup4==4.12.3
+jina==3.21.0
+
+# --- Optimization ---
+ortools==9.8.3296
+
+# --- Monitoring ---
+sentry-sdk[fastapi]==1.40.0
+posthog==3.3.1
+opentelemetry-api==1.22.0
+opentelemetry-sdk==1.22.0
+opentelemetry-instrumentation-fastapi==0.43b0
+
+# --- Data Processing ---
+numpy==1.26.3
+pandas==2.1.5
+scikit-learn==1.4.0
+
+# --- Security ---
+cryptography==42.0.0
+
+# --- Testing ---
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+httpx==0.26.0
+
+# --- Utilities ---
+python-dateutil==2.8.2
+tenacity==8.2.3
+structlog==24.1.0

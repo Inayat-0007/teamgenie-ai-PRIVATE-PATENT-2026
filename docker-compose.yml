@@ -1,0 +1,172 @@
+# ============================================================
+# TeamGenie AI — Local Development Environment
+# Usage: docker-compose up -d
+# Docs: docs/guides/LOCAL_DEVELOPMENT.md
+# ============================================================
+
+version: '3.9'
+
+services:
+  # ==========================================
+  # BACKEND (FastAPI)
+  # ==========================================
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    container_name: teamgenie-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./apps/api:/app
+      - /app/__pycache__
+    env_file:
+      - ./apps/api/.env
+    environment:
+      - PYTHON_ENV=development
+      - API_RELOAD=true
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - teamgenie-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ==========================================
+  # FRONTEND (Next.js)
+  # ==========================================
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+    container_name: teamgenie-web
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+      - /app/.next
+    env_file:
+      - ./apps/web/.env.local
+    environment:
+      - NODE_ENV=development
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    command: bun dev
+    depends_on:
+      - api
+    networks:
+      - teamgenie-network
+
+  # ==========================================
+  # REDIS (Cache — local replacement for Upstash)
+  # ==========================================
+  redis:
+    image: redis:7-alpine
+    container_name: teamgenie-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --requirepass teamgenie_dev_redis
+    networks:
+      - teamgenie-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "teamgenie_dev_redis", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================
+  # POSTGRES (local replacement for Supabase)
+  # ==========================================
+  postgres:
+    image: postgres:15-alpine
+    container_name: teamgenie-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: teamgenie_dev
+      POSTGRES_USER: teamgenie
+      POSTGRES_PASSWORD: local_dev_password_change_in_prod
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - teamgenie-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U teamgenie"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ==========================================
+  # ADMINER (Database GUI)
+  # ==========================================
+  adminer:
+    image: adminer:latest
+    container_name: teamgenie-adminer
+    ports:
+      - "8080:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres
+    depends_on:
+      - postgres
+    networks:
+      - teamgenie-network
+
+  # ==========================================
+  # MAILHOG (Email Testing)
+  # ==========================================
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: teamgenie-mailhog
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - teamgenie-network
+
+  # ==========================================
+  # QDRANT (Vector DB — local replacement for Pinecone)
+  # ==========================================
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: teamgenie-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"  # gRPC
+    volumes:
+      - qdrant-data:/qdrant/storage
+    networks:
+      - teamgenie-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ==========================================
+# VOLUMES (persistent data)
+# ==========================================
+volumes:
+  redis-data:
+    driver: local
+  postgres-data:
+    driver: local
+  qdrant-data:
+    driver: local
+
+# ==========================================
+# NETWORKS
+# ==========================================
+networks:
+  teamgenie-network:
+    driver: bridge

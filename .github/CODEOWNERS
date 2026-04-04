@@ -1,0 +1,23 @@
+# TeamGenie AI — Code Owners
+# These owners will be auto-requested for PR review
+
+# Global
+* @Inayat-0007
+
+# Backend
+apps/api/ @Inayat-0007
+packages/rag/ @Inayat-0007
+packages/ai/ @Inayat-0007
+
+# Frontend
+apps/web/ @Inayat-0007
+apps/mobile/ @Inayat-0007
+
+# Infrastructure
+infra/ @Inayat-0007
+.github/ @Inayat-0007
+
+# Security-sensitive files
+SECURITY.md @Inayat-0007
+apps/api/security/ @Inayat-0007
+apps/api/middleware/ @Inayat-0007
