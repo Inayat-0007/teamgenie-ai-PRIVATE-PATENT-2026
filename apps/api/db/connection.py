@@ -8,22 +8,33 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-import structlog
-from tenacity import (
-    retry,
-    stop_after_attempt,
-    wait_exponential,
-    retry_if_exception_type,
-    before_sleep_log,
-)
+try:
+    import structlog
+    logger = structlog.get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
-logger = structlog.get_logger(__name__)
-
-_RETRY_KWARGS = {
-    "stop": stop_after_attempt(3),
-    "wait": wait_exponential(multiplier=1, min=1, max=10),
-    "retry": retry_if_exception_type(Exception),
-}
+try:
+    from tenacity import (
+        retry,
+        stop_after_attempt,
+        wait_exponential,
+        retry_if_exception_type,
+        before_sleep_log,
+    )
+    _RETRY_KWARGS = {
+        "stop": stop_after_attempt(3),
+        "wait": wait_exponential(multiplier=1, min=1, max=10),
+        "retry": retry_if_exception_type(Exception),
+    }
+except ImportError:
+    # Fallback: no-op retry decorator when tenacity not installed
+    def retry(**kwargs):  # type: ignore[misc]
+        def decorator(fn):
+            return fn
+        return decorator
+    _RETRY_KWARGS = {}
 
 
 @retry(**_RETRY_KWARGS)

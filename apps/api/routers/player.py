@@ -7,9 +7,12 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
 
-import structlog
-
-logger = structlog.get_logger(__name__)
+try:
+    import structlog
+    logger = structlog.get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
 router = APIRouter()
 

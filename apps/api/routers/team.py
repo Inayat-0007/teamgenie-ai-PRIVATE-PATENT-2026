@@ -7,12 +7,16 @@ from __future__ import annotations
 
 import time
 
-import structlog
+try:
+    import structlog
+    logger = structlog.get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
+
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import List, Optional
-
-logger = structlog.get_logger(__name__)
 
 router = APIRouter()
 

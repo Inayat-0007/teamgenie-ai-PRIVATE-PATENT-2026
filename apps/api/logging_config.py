@@ -7,11 +7,14 @@ from __future__ import annotations
 import os
 import sys
 
-import structlog
-
 
 def configure_logging():
-    """Configure structlog for the application environment."""
+    """Configure structlog for the application environment. No-op if structlog not installed."""
+    try:
+        import structlog
+    except ImportError:
+        return  # structlog not installed — skip configuration
+
     is_dev = os.getenv("PYTHON_ENV", "development") == "development"
 
     processors = [

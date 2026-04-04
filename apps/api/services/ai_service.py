@@ -9,9 +9,12 @@ import asyncio
 import os
 from typing import Any, Optional
 
-import structlog
-
-logger = structlog.get_logger(__name__)
+try:
+    import structlog
+    logger = structlog.get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
 # Configuration
 _TEAM_SIZE = 11

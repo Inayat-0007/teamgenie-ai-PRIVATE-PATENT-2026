@@ -7,10 +7,14 @@ from __future__ import annotations
 import asyncio
 from typing import List, Optional
 
-import structlog
-from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
+try:
+    import structlog
+    logger = structlog.get_logger(__name__)
+except ImportError:
+    import logging
+    logger = logging.getLogger(__name__)
 
-logger = structlog.get_logger(__name__)
+from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
 
 router = APIRouter()
 

@@ -5,7 +5,12 @@ Auth Router — Supabase JWT authentication.
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
+
+try:
+    from pydantic import EmailStr
+except ImportError:
+    EmailStr = str  # type: ignore[misc,assignment]
 
 router = APIRouter()
 

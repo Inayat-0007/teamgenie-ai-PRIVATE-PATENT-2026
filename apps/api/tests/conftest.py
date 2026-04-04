@@ -5,6 +5,10 @@ Test configuration — Fixtures for FastAPI testing.
 from __future__ import annotations
 
 import os
+import sys
+
+# Ensure the api directory is on Python's path (needed for CI runners)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 # Force safe test mode BEFORE any app imports
 os.environ["PYTHON_ENV"] = "test"
@@ -12,10 +16,10 @@ os.environ["ENABLE_AI_FIREWALL"] = "false"
 os.environ["ENABLE_SELF_HEALING"] = "false"
 os.environ["SUPABASE_JWT_SECRET"] = "test-jwt-secret-for-ci"
 
-import pytest
-from fastapi.testclient import TestClient
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 
-from main import app  # noqa: E402 — must import after env setup
+from main import app  # noqa: E402
 
 
 @pytest.fixture
