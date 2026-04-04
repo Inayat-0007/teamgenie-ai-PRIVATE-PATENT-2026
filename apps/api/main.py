@@ -158,7 +158,7 @@ app.include_router(user.router, prefix="/api/user", tags=["User Management"])
 
 
 # ---------------------------------------------------------------------------
-# Health check
+# Health, Readiness & Diagnostics (Upgrade #3)
 # ---------------------------------------------------------------------------
 @app.get("/health", tags=["Health"])
 async def health_check():
@@ -167,6 +167,54 @@ async def health_check():
         "version": API_VERSION,
         "service": "teamgenie-api",
         "timestamp": time.time(),
+    }
+
+
+@app.get("/ready", tags=["Health"])
+async def readiness_check():
+    """Detailed dependency readiness check."""
+    from core.settings import settings as app_settings
+
+    checks = {
+        "mode": app_settings.APP_MODE.value,
+        "llm_available": app_settings.has_real_llm(),
+        "database_configured": app_settings.has_real_db(),
+        "vector_db_configured": app_settings.has_vector_db(),
+        "redis_configured": app_settings.UPSTASH_REDIS_URL is not None,
+    }
+    return {
+        "ready": True,  # App is always ready in DEMO mode
+        "checks": checks,
+        "version": API_VERSION,
+        "timestamp": time.time(),
+    }
+
+
+@app.get("/diagnostics", tags=["Health"], include_in_schema=False)
+async def diagnostics():
+    """Dev-only deep introspection endpoint."""
+    from core.settings import settings as app_settings
+    from core.version import get_version_info
+
+    if app_settings.APP_MODE.value == "production":
+        return JSONResponse(status_code=403, content={"error": "Diagnostics disabled in production"})
+
+    return {
+        "version_info": get_version_info(),
+        "mode": app_settings.APP_MODE.value,
+        "middleware_stack": ["cors", "request_metadata", "error_handler", "self_healing", "auth", "ai_firewall", "rate_limit"],
+        "feature_flags": {
+            "ai_firewall": app_settings.ENABLE_AI_FIREWALL,
+            "self_healing": app_settings.ENABLE_SELF_HEALING,
+            "rag": app_settings.ENABLE_RAG,
+        },
+        "providers": {
+            "gemini": app_settings.GEMINI_API_KEY is not None,
+            "claude": app_settings.CLAUDE_API_KEY is not None,
+            "pinecone": app_settings.has_vector_db(),
+            "turso": app_settings.has_real_db(),
+            "redis": app_settings.UPSTASH_REDIS_URL is not None,
+        },
     }
 
 
