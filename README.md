@@ -1,10 +1,5 @@
 <div align="center">
 
-  <a href="https://github.com/Inayat-0007/teamgenie-ai-PRIVATE-PATENT-2026">
-    <img src="inayat%20DEVELOPER%20media/THUMBNIL.png" alt="TeamGenie AI Architecture & Vision" width="100%">
-  </a>
-  <br>
-
   <h1>TeamGenie AI 🧞‍♂️</h1>
   <p><strong>A Hyper-Optimized, Multi-Agent Fantasy Sports Intelligence Framework.</strong></p>
   <p><em>Engineered by Mohammed Inayat Hussain Qureshi</em></p>
@@ -27,89 +22,89 @@
 
 ---
 
-## 📊 VERSION COMPARISON: v1.0 → v2.0 (Master Doctrine Upgrade)
+## 📊 VERSION COMPARISON: v1.0 → v2.0 → v2.5 (Full Stack Evolution)
 
-> This project has evolved through **18+ commits** from an initial scaffold to a production-grade, self-aware AI platform.
+> This project has evolved through **20+ commits** from an initial scaffold to a production-grade, self-aware AI platform with a complete addictive frontend.
 
 ### 🔄 What Changed — The Full Before vs After
 
 <table>
 <tr>
-<th width="40%">🔴 v1.0 (Initial — April 4, 2026)</th>
-<th width="40%">🟢 v2.0 (Master Doctrine — April 5, 2026)</th>
-<th width="20%">Impact</th>
+<th width="30%">🔴 v1.0 (Initial — April 4, 2026)</th>
+<th width="35%">🟢 v2.0 (Master Doctrine — April 5, 2026)</th>
+<th width="35%">🚀 v2.5 (Phase 3 Frontend — April 5, 2026)</th>
 </tr>
 
 <tr>
 <td>Single <code>/health</code> endpoint</td>
 <td><code>/health</code> + <code>/ready</code> + <code>/diagnostics</code></td>
-<td>🟢 Professional operational visibility</td>
+<td>Frontend health bypass in DEMO mode — UI works with no backend</td>
 </tr>
 
 <tr>
 <td>Greedy heuristic solver only</td>
 <td>OR-Tools ILP Solver with greedy fallback</td>
-<td>🟢 10-15% better team optimization</td>
+<td>AI generation exposed via 3-column generate page with live agent progress</td>
 </tr>
 
 <tr>
 <td>Raw player data → agents</td>
 <td>Statistical projection engine (floor/ceiling/form) → agents</td>
-<td>🟢 Richer AI context</td>
+<td>PlayerCard visualises floor/ceiling/form with spring physics animations</td>
 </tr>
 
 <tr>
 <td>No timing breakdown</td>
 <td>Per-stage millisecond instrumentation (<code>RequestTimer</code>)</td>
-<td>🟢 Honest performance claims</td>
+<td>Loading UI mirrors agent stage sequence (Budget → Differential → Risk)</td>
 </tr>
 
 <tr>
 <td>No versioning</td>
 <td>Engine version <code>tg-engine-v2.0.0</code> in every response</td>
-<td>🟢 A/B testing ready</td>
+<td>Version badge shown in landing hero section with gradient animation</td>
 </tr>
 
 <tr>
 <td>No audit trail</td>
 <td>JSONL forensic audit of every generation</td>
-<td>🟢 Full reproducibility</td>
+<td>History / My Squads page surfaces past squad data</td>
 </tr>
 
 <tr>
 <td>Generation + explanation coupled</td>
 <td>Separate <code>/generate</code> (fast) + <code>/explain</code> (LLM)</td>
-<td>🟢 Cleaner architecture</td>
+<td>ScoutFeed auto-streams contextual AI insights alongside generation results</td>
 </tr>
 
 <tr>
 <td>No runtime mode awareness</td>
 <td>DEMO / HYBRID / PRODUCTION tri-modal system</td>
-<td>🟢 Zero-config local dev</td>
+<td>Frontend <code>aiKit</code> tri-modal with smart mock fallbacks, never blank screen</td>
 </tr>
 
 <tr>
 <td>No external API resilience</td>
 <td>Circuit Breaker with 3-retry + exponential backoff + fallback</td>
-<td>🟢 99.9% uptime</td>
+<td>DEMO mode guarantees full UI works with zero backend running</td>
 </tr>
 
 <tr>
 <td>5 tests</td>
 <td>9 tests (readiness, diagnostics, timing, versioning, explain)</td>
-<td>🟢 80% more test coverage</td>
+<td>Full page suite: home, generate, players, matches, history, auth</td>
 </tr>
 
 <tr>
 <td>No graceful degradation</td>
 <td>Graceful fallback: ILP→greedy→cache→503</td>
-<td>🟢 Never shows raw 500 errors</td>
+<td>UI fallback: real API → rich DEMO mock data, user never sees a blank screen</td>
 </tr>
 
 <tr>
-<td>Hardcoded model version <code>"1.0.0"</code></td>
-<td>Dynamic <code>get_version_info()</code> with algorithm hash</td>
-<td>🟢 Production debugging</td>
+<td>No authentication UI</td>
+<td>Supabase JWT backend auth</td>
+<td>Login / Register / Forgot-Password pages with Supabase demo bypass</td>
 </tr>
 </table>
 
@@ -126,6 +121,7 @@
 | **v1.1** (CI Green) | Apr 4, 18:00 | `145af0f`–`abb6dcc` | All CI passing — merged PR #1 and PR #2 |
 | **v1.5** (Full Stack) | Apr 4, 21:00 | `6c1df37` | Full local deployment verified. Both servers running. |
 | **v2.0** (Doctrine) | Apr 5, 03:40 | `3a4adc2` | **Master Doctrine v2.0 — 13 production upgrades, 9/9 tests** |
+| **v2.5** (Phase 3 Frontend) | Apr 5, 00:18 | `be6c26d` | **Full Frontend Suite — Auth, Generate, Scout Intelligence, Navigation** |
 
 ---
 
@@ -202,7 +198,14 @@ graph TD
 
 | Service | URL | Status | Engine |
 |---------|-----|--------|--------|
-| **Frontend** | `http://localhost:3000` | 🟢 LIVE | Next.js 14 App Router |
+| **Landing Page** | `http://localhost:3000` | 🟢 LIVE | Next.js 14 Hero with gradient animation |
+| **Auto-Generate** | `http://localhost:3000/team/generate` | 🟢 LIVE | 3-column AI generation UI + ScoutFeed |
+| **Matches** | `http://localhost:3000/matches` | 🟢 LIVE | Upcoming matches with prize pools |
+| **Players** | `http://localhost:3000/players` | 🟢 LIVE | Player analytics directory |
+| **My Squads** | `http://localhost:3000/history` | 🟢 LIVE | Historical squads & rankings |
+| **Login** | `http://localhost:3000/auth/login` | 🟢 LIVE | Supabase auth + demo bypass |
+| **Register** | `http://localhost:3000/auth/register` | 🟢 LIVE | New account creation |
+| **Forgot Password** | `http://localhost:3000/auth/forgot-password` | 🟢 LIVE | Password reset flow |
 | **Backend API** | `http://localhost:8000` | 🟢 LIVE | FastAPI + Uvicorn |
 | **Swagger Docs** | `http://localhost:8000/docs` | 🟢 LIVE | OpenAPI 3.1 |
 | **Health** | `http://localhost:8000/health` | 🟢 LIVE | `{"status":"healthy"}` |
@@ -211,7 +214,7 @@ graph TD
 
 ---
 
-## 🏗️ Repository Anatomy (v2.0)
+## 🏗️ Repository Anatomy (v2.5)
 
 ```
 teamgenie-ai/
@@ -227,6 +230,21 @@ teamgenie-ai/
 │   │   ├── tests/           → 9 tests covering all v2.0 upgrades
 │   │   └── db/              → Database connection with tenacity retry
 │   ├── web/                 → Next.js 14 frontend (App Router, Framer Motion)
+│   │   ├── app/
+│   │   │   ├── auth/        → 🆕 Login, Register, Forgot-Password (v2.5)
+│   │   │   ├── team/generate/ → 🆕 3-column AI generate page (v2.5)
+│   │   │   ├── matches/     → 🆕 Upcoming matches with prize pools (v2.5)
+│   │   │   ├── players/     → 🆕 Players analytics directory (v2.5)
+│   │   │   ├── history/     → 🆕 My Squads / History page (v2.5)
+│   │   │   ├── layout.tsx   → Root layout with Navigation component
+│   │   │   └── page.tsx     → Landing hero with gradient animation
+│   │   ├── components/
+│   │   │   ├── Navigation.tsx → 🆕 Glassmorphic navbar + Framer Motion (v2.5)
+│   │   │   ├── PlayerCard.tsx → 🆕 Spring physics player card (v2.5)
+│   │   │   └── ScoutFeed.tsx  → 🆕 Live AI intelligence sidebar (v2.5)
+│   │   └── lib/
+│   │       ├── api.ts       → 🆕 Tri-modal aiKit (DEMO/HYBRID/PRODUCTION) (v2.5)
+│   │       └── utils.ts     → 🆕 cn() class name helper (v2.5)
 │   └── mobile/              → Expo 52 React Native app
 ├── 📂 packages/
 │   ├── ai/                  → CrewAI agent configs (3 agents)
@@ -350,7 +368,6 @@ curl -X POST http://localhost:8000/api/team/generate \
 | [30-Year Senior AI Engineer Doc](30%20YEAR%20SENIOR%20AI%20ENGINEER%20NAME%20-%20MOHAMMAD%20INAYAT%20HUSSAIN.md) | Exhaustive architectural analysis (0%→100%) |
 | [inayatthoughtaboutproject.txt](inayatthoughtaboutproject.txt) | Original master doctrine & vision |
 | [Architecture Docs](docs/technical/ARCHITECTURE.md) | Technical architecture deep-dive |
-| [Developer Media](inayat%20DEVELOPER%20media/) | Tutorial videos, playbook PDF, thumbnails |
 
 ---
 

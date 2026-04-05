@@ -17,6 +17,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.0] - 2026-04-05
+
+### 🚀 Phase 3: Addictive UI + Scout Intelligence Feed + Full Frontend Suite
+
+**Architect: Mohammad Inayat Hussain | Engine: Master Doctrine v2.0**
+
+#### Added
+
+**Authentication Pages**
+- Login page with Supabase integration and demo bypass for local development
+- Registration page with form validation and Supabase signup
+- Forgot-password page with email reset flow
+
+**Dashboard Pages**
+- `/matches` — Upcoming match listings with prize pool amounts
+- `/players` — Players analytics directory with form scores, projected points, floor/ceiling ranges, and differential flags
+- `/history` — My Squads / History page showing past squad performance, rank, and points
+
+**Team Generation Page (`/team/generate`)**
+- 3-column layout: Parameters panel | Results grid | AI Scout Intel feed
+- Match selector, budget range slider, and risk profile picker (Safe / Balanced / Aggressive)
+- Animated loading sequence mirroring the 3-agent pipeline (Budget Optimizer → Differential Expert → Risk Manager)
+- Stats bar showing total cost, projected total, risk score, and player count
+- Staggered player grid with `staggerChildren: 0.05` cascade animation
+
+**New Components**
+- `Navigation` — Glassmorphic fixed navbar with Framer Motion active-tab indicator (`layoutId` shared animation), Sign In / Get Started CTA links
+- `PlayerCard` — Spring physics card (stiffness: 400, damping: 25) with `whileHover` / `whileTap` micro-interactions; Captain (2×) and Vice-Captain (1.5×) badges
+- `ScoutFeed` — Live AI intelligence sidebar that auto-streams mock insights sequentially over 9 seconds using `AnimatePresence`
+
+**API Layer (`lib/api.ts`)**
+- `aiKit` client with tri-modal strategy: calls real backend, falls back to rich DEMO mock data on error — UI never shows a blank screen
+- `generateTeam()` — posts to `/api/team/generate`, returns 11-player squad with captain/VC
+- `getMatches()` — returns upcoming IPL and World Cup fixtures
+- `getHistory()` — returns past squad performance records
+- `getPlayers()` — returns player analytics with differential flags
+
+**Utilities (`lib/utils.ts`)**
+- `cn()` helper using `clsx` + `tailwind-merge` for conditional class composition
+
+**Landing Page (`app/page.tsx`)**
+- Hero section with gradient background orbs, staggered entrance animations, and feature-card grid
+
+**Layout (`app/layout.tsx`)**
+- Root layout now includes `<Navigation />` component with `pt-16` body offset
+
+#### Changed
+- `globals.css` — Replaced default Tailwind boilerplate with dark-mode design system: `glass-panel` utility class, `text-gradient` utility, CSS custom properties for slate/indigo palette, and scrollbar styles
+- `package.json` — Added `framer-motion`, `lucide-react`, `clsx`, `tailwind-merge`; removed unused dependencies
+
+#### Removed
+- `inayat DEVELOPER media/` folder — Tutorial videos, playbook PDF, and thumbnail image removed from repository to reduce binary asset size
+
+---
+
 ## [1.0.0] - 2026-01-15
 
 ### 🎉 Initial Release
@@ -196,7 +251,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/Inayat-0007/teamgenie-ai/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Inayat-0007/teamgenie-ai/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/Inayat-0007/teamgenie-ai-PRIVATE-PATENT-2026/commit/be6c26d0472f17c2a2832d2fdb33883d31c3075c
 [1.0.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v1.0.0
 [0.9.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v0.9.0
 [0.8.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v0.8.0
