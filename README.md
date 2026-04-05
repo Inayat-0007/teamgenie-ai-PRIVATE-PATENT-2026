@@ -10,10 +10,10 @@
   <p><em>Engineered by Mohammed Inayat Hussain Qureshi</em></p>
   
   <p>
-    <a href="https://teamgenie.app">View Demo</a> ·
-    <a href="docs/technical/ARCHITECTURE.md">Read Architecture</a> ·
-    <a href="CONTEXT.md">System Context</a> ·
-    <a href="30%20YEAR%20SENIOR%20AI%20ENGINEER%20NAME%20-%20MOHAMMAD%20INAYAT%20HUSSAIN.md">Deep Dive Engineering Doc</a>
+    <a href="https://teamgenie.app"><b>Live Demo</b></a> &nbsp;&middot;&nbsp; 
+    <a href="docs/technical/ARCHITECTURE.md"><b>Architecture</b></a> &nbsp;&middot;&nbsp; 
+    <a href="docs/technical/VERSION_COMPARISON.md"><b>Changelog</b></a> &nbsp;&middot;&nbsp; 
+    <a href="CONTEXT.md"><b>System Context</b></a>
   </p>
 
   <p>
@@ -23,120 +23,68 @@
     <img src="https://img.shields.io/badge/Agents-3_CrewAI-orange?style=for-the-badge&logo=openai" alt="Agents" />
     <img src="https://img.shields.io/badge/CI-All_Green-brightgreen?style=for-the-badge&logo=github-actions" alt="CI" />
     <img src="https://img.shields.io/badge/JIT-DuckDuckGo-blueviolet?style=for-the-badge&logo=duckduckgo" alt="JIT" />
-    <img src="https://img.shields.io/badge/Tiers-Free%20|%20Pro%20|%20Elite-gold?style=for-the-badge&logo=stripe" alt="Tiers" />
+    <img src="https://img.shields.io/badge/Tiers-Free_|_Pro_|_Elite-gold?style=for-the-badge&logo=stripe" alt="Tiers" />
   </p>
 </div>
 
 ---
 
-## 📊 VERSION HISTORY: v1.0 → v2.0 → v3.0
+## 🚀 Features (v3.0 Master Release)
 
-> This project has evolved through **25+ commits** across **9 phases** from an initial scaffold to a production-grade, monetizable AI SaaS platform.
-
-### 🔄 What Changed — The Full Before vs After
-
-<table>
-<tr>
-<th width="40%">🔴 v1.0 (Initial — April 4, 2026)</th>
-<th width="40%">🟢 v2.0 (Master Doctrine — April 5, 2026)</th>
-<th width="20%">Impact</th>
-</tr>
-
-<tr>
-<td>Single <code>/health</code> endpoint</td>
-<td><code>/health</code> + <code>/ready</code> + <code>/diagnostics</code></td>
-<td>🟢 Professional operational visibility</td>
-</tr>
-
-<tr>
-<td>Greedy heuristic solver only</td>
-<td>OR-Tools ILP Solver with greedy fallback</td>
-<td>🟢 10-15% better team optimization</td>
-</tr>
-
-<tr>
-<td>Raw player data → agents</td>
-<td>Statistical projection engine (floor/ceiling/form) → agents</td>
-<td>🟢 Richer AI context</td>
-</tr>
-
-<tr>
-<td>No timing breakdown</td>
-<td>Per-stage millisecond instrumentation (<code>RequestTimer</code>)</td>
-<td>🟢 Honest performance claims</td>
-</tr>
-
-<tr>
-<td>No versioning</td>
-<td>Engine version <code>tg-engine-v2.0.0</code> in every response</td>
-<td>🟢 A/B testing ready</td>
-</tr>
-
-<tr>
-<td>No audit trail</td>
-<td>JSONL forensic audit of every generation</td>
-<td>🟢 Full reproducibility</td>
-</tr>
-
-<tr>
-<td>Generation + explanation coupled</td>
-<td>Separate <code>/generate</code> (fast) + <code>/explain</code> (LLM)</td>
-<td>🟢 Cleaner architecture</td>
-</tr>
-
-<tr>
-<td>No runtime mode awareness</td>
-<td>DEMO / HYBRID / PRODUCTION tri-modal system</td>
-<td>🟢 Zero-config local dev</td>
-</tr>
-
-<tr>
-<td>No external API resilience</td>
-<td>Circuit Breaker with 3-retry + exponential backoff + fallback</td>
-<td>🟢 99.9% uptime</td>
-</tr>
-
-<tr>
-<td>5 tests</td>
-<td>9 tests (readiness, diagnostics, timing, versioning, explain)</td>
-<td>🟢 80% more test coverage</td>
-</tr>
-
-<tr>
-<td>No graceful degradation</td>
-<td>Graceful fallback: ILP→greedy→cache→503</td>
-<td>🟢 Never shows raw 500 errors</td>
-</tr>
-
-<tr>
-<td>Hardcoded model version <code>"1.0.0"</code></td>
-<td>Dynamic <code>get_version_info()</code> with algorithm hash</td>
-<td>🟢 Production debugging</td>
-</tr>
-</table>
+*   **Triple-Pillar UI/UX (`Next.js 14 + Framer Motion`)**: 
+    *   **Tier 1 (Free)**: 1-Click Tinder-style lineup generator with psychological upgrade blurs.
+    *   **Tier 2 (Pro)**: 3-Column analytical dashboard featuring live Toss Intelligence and ScoutFeed.
+    *   **Tier 3 (Elite)**: Bloomberg-style natural language terminal `/chat` for generative queries.
+*   **Zero-Hallucination JIT Intelligence**: DuckDuckGo integration automatically scrapes real-time weather, injury news, and pitch reports globally per-match before AI generation.
+*   **3-Agent Consensus Framework**: Multi-agent CrewAI orchestration utilizing Google OR-Tools Integer Linear Programming (ILP) to rigorously optimize the ₹100 team budget constraint.
+*   **Production-Grade Telemetry**: Per-stage millisecond tracking (`RequestTimer`), structured JSONL forensic auditing, and full Prometheus `/metrics` exposing application health.
+*   **SaaS Monetization Engine**: Built-in 3-Tier subscription constraints enforced at the FastAPI middleware routing layer.
 
 ---
 
-## 🧬 Version History
+## 🏗️ Tech Stack
 
-| Version | Date | Commits | Summary |
-|---------|------|---------|---------|
-| **v0.0** (Scaffold) | Apr 4, 12:00 | `93df459` | 63 files scaffolded. Architecture docs, schemas, and standards |
-| **v0.1** (CI Fixes) | Apr 4, 14:30 | `5ef300d`–`1dd6580` | Linting, pytest mocks, unpin deps for prototype |
-| **v0.5** (Docs) | Apr 4, 15:00 | `bdca172`–`8d2389b` | Developer media, banner thumbnail, README |
-| **v1.0** (Stable) | Apr 4, 16:00 | `bec3e0b` | 90+ production-grade improvements across entire monorepo |
-| **v1.1** (CI Green) | Apr 4, 18:00 | `145af0f`–`abb6dcc` | All CI passing — merged PR #1 and PR #2 |
-| **v1.5** (Full Stack) | Apr 4, 21:00 | `6c1df37` | Full local deployment verified. Both servers running. |
-| **v2.0** (Doctrine) | Apr 5, 03:40 | `3a4adc2` | **Master Doctrine v2.0 — 13 production upgrades, 9/9 tests** |
-| **v2.5** (Addictive UI) | Apr 5, 04:00 | `be6c26d` | Phase 3: Framer Motion spring physics, ScoutFeed, 3-column dashboard |
-| **v2.7** (Elite UI) | Apr 5, 06:00 | `b837539` | Phase 4: 3-Tier Monetization Frontend, `/chat` terminal, paywall hooks |
-| **v3.0** (Production) | Apr 5, 07:00 | `latest` | **Phases 5-9: JIT DDG Scraper, Subscriptions, Weather/Toss, Prometheus, Gunicorn** |
+| Category | Technologies Used |
+| :--- | :--- |
+| **Frontend Platform** | Next.js 14 (App Router), React, Tailwind CSS, Framer Motion |
+| **Backend API Core** | FastAPI, Uvicorn, Gunicorn, Python 3.11, Pydantic |
+| **AI & Logistics Engine** | CrewAI, LangChain, Google OR-Tools, Pinecone (Vector RAG) |
+| **Databases & Cache** | Turso (SQLite Edge DB), Upstash Redis |
+| **JIT Orchestration** | DuckDuckGo Search API, Open-Meteo, Tenacity Circuit Breakers |
+| **DevOps & Security** | Docker, Kubernetes (K8s), GitHub Actions, Cloudflare, Supabase JWT |
 
 ---
 
-## 🗺️ Visual Architecture Mapping
+## 📂 Repository Structure — Turborepo
 
-The system breathes through isolated layers—the frontend has zero database context, and the AI agents have zero HTTP context.
+Our highly structured Turborepo enables independent scaling of microservices while maintaining strict TypeScript/Python boundaries.
+
+```text
+teamgenie-ai/
+├── 📂 apps/
+│   ├── api/                 → FastAPI core backend (The AI Orchestrator)
+│   │   ├── middleware/      → JWT Auth, Rate Limits, AI Firewalls
+│   │   ├── routers/         → Team (monetized), Player, Match, Auth, Metrics
+│   │   ├── services/        → CrewAI Pipeline, JIT Scraper, Subs Service
+│   │   └── Dockerfile       → Production Multi-stage Image Build
+│   ├── web/                 → Next.js 14 React Frontend 
+│   │   ├── app/             → Route Groups (Matches, Pro Gen, Elite Chat)
+│   │   └── components/      → Reusable UI (Glassmorphism, Animations)
+│   └── mobile/              → React Native Expo application stub
+├── 📂 packages/
+│   ├── ai/                  → CrewAI configurations, schemas
+│   └── shared/              → Shared TypeScript definitions
+├── 📂 db/                   → Relational Migrations for Turso/SQLite
+├── 📂 infra/                → Kubernetes Deployments & Cloudflare configs
+├── 📂 docs/                 → In-depth architecture & comparison files
+└── 📄 CONTEXT.md            → Living master state for AI collaboration
+```
+
+---
+
+## 🤖 AI Agent Pipeline Flow
+
+The system breathes through highly isolated layers. The frontend has zero database context, and the CrewAI Python agents have zero HTTP context. The FastAPI core acts as the secure orchestrator.
 
 ```mermaid
 graph TD
@@ -149,234 +97,143 @@ graph TD
     classDef new fill:#14532d,stroke:#22c55e,stroke-width:3px,color:#fff
 
     subgraph Clients
-        W[Next.js Web Client]:::client
-        M[React Native Mobile]:::client
+        W[Next.js 14 App Router]:::client
+        M[React Native Expo Mobile]:::client
     end
 
-    subgraph Security Layer
-        CF[Cloudflare Edge Worker<br>KV Cache & Geo-Block]:::edge
-        FW[FastAPI AI Firewall<br>XSS/SQLi Block]:::api
+    subgraph CDN & Security Edge
+        CF[Cloudflare Edge Worker]:::edge
+        FW[FastAPI AI Firewall]:::api
     end
 
-    subgraph Core Backend
-        API[FastAPI Router<br>Auth & Validations]:::api
-        RAG[Parallel RAG Pipeline<br>4-Index Sync]:::api
-        READY["/ready + /diagnostics<br>v2.0 NEW"]:::new
+    subgraph Core Backend Routing Layer
+        API[FastAPI Main Router]:::api
+        PAY[Monetization & Tier Quotas]:::new
+        METRICS["Prometheus /metrics"]:::new
     end
 
-    subgraph "AI Intelligence (v2.0 Upgraded)"
-        PROJ["Projection Engine<br>floor/ceiling/form<br>v2.0 NEW"]:::new
-        B["Agent 1: Budget Optimizer<br>OR-Tools ILP + Greedy Fallback"]:::ai
-        D["Agent 2: Differential Expert<br>RAG + <25% Ownership"]:::ai
-        R["Agent 3: Risk Manager<br>Captain/VC Selection"]:::ai
-    end
-
-    subgraph "v2.0 New Systems"
-        TIMER["Stage Timer<br>Per-stage ms tracking"]:::new
-        AUDIT["Audit Trail<br>JSONL Forensic Log"]:::new
-        CB["Circuit Breaker<br>Retry + Fallback"]:::new
-        VER["Engine Version<br>tg-engine-v2.0.0"]:::new
+    subgraph AI Intelligence Engine v3.0.0
+        JIT["JIT DuckDuckGo Scraper<br>Injuries/Pitch/Weather"]:::new
+        B["Agent 1: Budget Optimizer<br>OR-Tools ILP"]:::ai
+        D["Agent 2: Differential Expert<br>RAG + Ownership Stats"]:::ai
+        R["Agent 3: Risk Manager<br>Captain/VC Assignment"]:::ai
     end
 
     subgraph Infrastructure
-        T[(Turso SQLite)]:::db
+        T[(Turso SQLite Edge DB)]:::db
         P[(Pinecone Vector DB)]:::db
-        U[(Upstash Redis)]:::db
+        U[(Upstash Redis Cache)]:::db
     end
 
-    %% Flow
-    W & M -->|HTTPS| CF
-    CF -->|Valid Request| FW
+    %% Flow Definitions
+    W & M -->|HTTPS / JWT| CF
+    CF -->|Clean Traffic| FW
     FW --> API
-    API -->|Fetch Context| RAG
-    RAG -->|Queries| P
-    API -->|Read/Write| T
-    API -->|Rate Limit| U
-    API -->|Enrich Players| PROJ
-    PROJ -->|Invoke Agents| B & D
+    API -->|Increment Quota| PAY
+    API -->|Trigger Generation| JIT
+    JIT -->|Inject Context| B & D
     B & D -->|Outputs| R
-    R -->|Final Roster| API
-    API -.->|Log| AUDIT
-    API -.->|Track| TIMER
-    B & D -.->|Protected by| CB
+    R -->|Final 11-Player Lineup| API
+    API -->|Persist Output| T
+    API -->|Global Rate Limit| U
+    API -.->|Expose Telemetry| METRICS
 ```
 
 ---
 
-## 🚀 What's Running Right Now
+## 🛡️ Security & Monetization Stack
 
-| Service | URL | Status | Engine |
-|---------|-----|--------|--------|
-| **Frontend** | `http://localhost:3000` | 🟢 LIVE | Next.js 14 App Router |
-| **Backend API** | `http://localhost:8000` | 🟢 LIVE | FastAPI + Uvicorn |
-| **Swagger Docs** | `http://localhost:8000/docs` | 🟢 LIVE | OpenAPI 3.1 |
-| **Health** | `http://localhost:8000/health` | 🟢 LIVE | `{"status":"healthy"}` |
-| **Readiness** | `http://localhost:8000/ready` | 🟢 LIVE | Dependency check |
-| **Diagnostics** | `http://localhost:8000/diagnostics` | 🟢 LIVE | Provider introspection |
+This framework utilizes a Defense-in-Depth methodology where security inherently supports the business logic.
 
----
-
-## 🏗️ Repository Anatomy (v2.0)
-
-```
-teamgenie-ai/
-├── 📂 apps/
-│   ├── api/                 → FastAPI Backend (The Core Brain)
-│   │   ├── core/            → 🆕 Settings, Version, Mode System (v2.0)
-│   │   ├── utils/           → 🆕 Timing, Circuit Breaker (v2.0)
-│   │   ├── middleware/      → Auth, Rate Limit, AI Firewall, Self-Healing
-│   │   ├── routers/         → Team (upgraded), Player, Match, Auth, User
-│   │   ├── services/        → AI Service (upgraded), RAG, Projection (new), Audit (new)
-│   │   ├── models/          → Pydantic models with strict validation
-│   │   ├── security/        → AI Firewall (10 regex patterns)
-│   │   ├── tests/           → 9 tests covering all v2.0 upgrades
-│   │   └── db/              → Database connection with tenacity retry
-│   ├── web/                 → Next.js 14 frontend (App Router, Framer Motion)
-│   └── mobile/              → Expo 52 React Native app
-├── 📂 packages/
-│   ├── ai/                  → CrewAI agent configs (3 agents)
-│   ├── rag/                 → Embedding logic (all-MiniLM-L6-v2, 384 dim)
-│   └── shared/              → TypeScript interfaces shared across apps
-├── 📂 db/                   → SQL migrations (5 tables, 14 indexes, 2 triggers)
-├── 📂 infra/                → Kubernetes HPA + Cloudflare Worker
-├── 📂 monitoring/           → Prometheus alerts + metrics
-├── 📂 docs/                 → Architecture, API, legal documentation
-├── 📂 scripts/              → Setup & deploy automation
-├── 📄 CONTEXT.md            → Living system context & state log (v2)
-├── 📄 docker-compose.yml    → 8-service local dev environment
-└── 📄 30 YEAR SENIOR AI ENGINEER NAME - MOHAMMAD INAYAT HUSSAIN.md
-```
+| Layer | Implementation | Status | Description Enforcement |
+|-------|-----------|--------|--------|
+| **Monetization Engine** | 3-Tier JWT Quota System | 🟢 Active | Disables generations based on: Free (2/wk), Pro (3/day), Elite (Unl). |
+| **Edge Protection** | Cloudflare Worker / AI Firewall | 🟢 Active | Geo-blocks banned regions. Analyzes payloads via 10 Regex patterns (SQLi, XSS, Prompt Injection). |
+| **Authentication** | Supabase JWT (HS256) | 🟢 Active | Cryptographically verifies User Tier claims at the FastAPI routing middleware before AI executes. |
+| **Frontend Paywalls** | CSS Backdrop Blurring | 🟢 Active | Obscures response payload from free users, leveraging psychological hooks to drive subscriptions. |
+| **API Resilience** | Tenacity Circuit Breakers | 🟢 Active | 3-retry + exponential backoff + graceful fallback. Prevents cascading failures to LLM APIs. |
 
 ---
 
-## 🤖 The 3-Agent AI Pipeline
+## ⚙️ Local Development Setup
 
-```
-                    ┌─────────────────────────────────┐
-                    │      Player Projection Engine    │  ← v2.0 NEW
-                    │  floor / ceiling / form / variance│
-                    └──────────────┬──────────────────┘
-                                   │
-                    ┌──────────────┴──────────────────┐
-                    ▼                                  ▼
-        ┌───────────────────┐           ┌───────────────────────┐
-        │  Agent 1: Budget  │           │  Agent 2: Differential │
-        │  Optimizer        │           │  Expert                │
-        │  ───────────────  │           │  ─────────────────     │
-        │  OR-Tools ILP     │           │  RAG + <25% Ownership  │
-        │  (greedy fallback)│           │  High-upside finder    │
-        │  LLM: Gemini Flash│           │  LLM: Gemini Flash     │
-        └────────┬──────────┘           └──────────┬────────────┘
-                 │                                  │
-                 └──────────┬───────────────────────┘
-                            ▼
-              ┌───────────────────────────┐
-              │  Agent 3: Risk Manager    │
-              │  ───────────────────────  │
-              │  Captain/VC assignment    │
-              │  Variance-based profiles  │
-              │  safe / balanced / aggro  │
-              │  LLM: Claude Haiku        │
-              └─────────────┬─────────────┘
-                            ▼
-              ┌───────────────────────────┐
-              │  11-Player Final Team ✅  │
-              │  Total Cost ≤ ₹100        │
-              │  4ms generation time      │
-              │  Audit trail logged       │  ← v2.0 NEW
-              └───────────────────────────┘
-```
+To boot up the production-ready infrastructure locally, you have two options:
 
----
-
-## 🛡️ Security Stack
-
-| Layer | Technology | Status |
-|-------|-----------|--------|
-| **Edge** | Cloudflare Worker (geo-block banned states) | 🟡 Coded |
-| **Firewall** | AI Firewall (10 regex: SQLi, XSS, path traversal) | ⬜ Toggle |
-| **Auth** | Supabase JWT (HS256/EdDSA) | 🟢 Active |
-| **Rate Limit** | Redis-backed leaky bucket (100 free / 1000 paid) | 🟡 Needs Redis |
-| **Self-Healing** | Claude suggests CSS fix when scraper breaks | ⬜ Toggle |
-| **Headers** | CSP + HSTS + X-Frame-Options + Referrer-Policy | 🟢 Active |
-| **CI Scanning** | TruffleHog secret scan + pip-audit + npm audit | 🟢 Active |
-| **Circuit Breaker** | 3-retry + exponential backoff + fallback | 🟢 Active (v2.0) |
-
----
-
-## ⚡ Developer Quickstart
-
-### Option A: Direct (Fastest)
+### Option A: Direct Native Run (Fastest Iteration)
 ```bash
-# Terminal 1 — Frontend
+# 1. Start Web Client (Terminal 1)
 npm install
 npm run dev:web
-# → http://localhost:3000
+# -> Live at http://localhost:3000
 
-# Terminal 2 — Backend  
+# 2. Start AI Backend (Terminal 2)
 cd apps/api
 python -m venv venv
-.\venv\Scripts\pip.exe install -r requirements.txt
-.\venv\Scripts\python.exe -m uvicorn main:app --reload --port 8000
-# → http://localhost:8000
+# Windows: .\venv\Scripts\Activate.ps1 | Mac/Linux: source venv/bin/activate
+pip install -r requirements.txt
+python -m uvicorn main:app --reload --port 8000
+# -> Live at http://localhost:8000
 ```
 
-### Option B: Docker (Full Stack)
+### Option B: Full Stack Docker
 ```bash
 docker compose up -d
-# API: 8000 | Web: 3000 | Redis: 6379 | Postgres: 5432 | Qdrant: 6333
-```
-
-### Test the AI Pipeline
-```bash
-curl -X POST http://localhost:8000/api/team/generate \
-  -H "Content-Type: application/json" \
-  -d '{"match_id":"ipl_2026_01","budget":100,"risk_level":"balanced"}'
+# Connects API to Redis, Postgres, and Vector DB containers.
 ```
 
 ---
 
-## 📊 CI/CD Pipeline
+## ⚡ Environment Configuration
 
-| Job | Steps | Status |
-|-----|-------|--------|
-| **Backend** | Python 3.11 → pip install → Ruff → Black → mypy → **pytest (9/9 ✅)** | 🟢 GREEN |
-| **Frontend** | Node 20 → npm install → ESLint → tsc → next build | 🟢 GREEN |
-| **Security** | pip-audit → npm audit → TruffleHog secret scan | 🟢 GREEN |
-| **Docker** | Build API image → smoke test FastAPI import | 🟢 GREEN |
+Rename `.env.example` to `.env` in the global root and populate the following keys to take the system from `DEMO` to `PRODUCTION`.
 
----
+```env
+# 1. Core LLM Intelligence (Required)
+GEMINI_API_KEY=your_gemini_key_here
+CLAUDE_API_KEY=your_claude_key_here
 
-## 📂 Key Documentation
+# 2. Database & Data Stores (Required)
+TURSO_DATABASE_URL=libsql://your-turso-url.turso.io
+TURSO_AUTH_TOKEN=your_turso_token
+PINECONE_API_KEY=your_pinecone_key
 
-| Document | Purpose |
-|----------|---------|
-| [CONTEXT.md](CONTEXT.md) | Living system state, access control, change log (v2) |
-| [30-Year Senior AI Engineer Doc](30%20YEAR%20SENIOR%20AI%20ENGINEER%20NAME%20-%20MOHAMMAD%20INAYAT%20HUSSAIN.md) | Exhaustive architectural analysis (0%→100%) |
-| [inayatthoughtaboutproject.txt](inayatthoughtaboutproject.txt) | Original master doctrine & vision |
-| [Architecture Docs](docs/technical/ARCHITECTURE.md) | Technical architecture deep-dive |
-| [Developer Media](inayat%20DEVELOPER%20media/) | Tutorial videos, playbook PDF, thumbnails |
+# 3. Security & Authentication (Required)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role
+SUPABASE_JWT_SECRET=your_jwt_secret
 
----
-
-## 🤝 Code of Conduct & Contributing
-
-Before contributing, you **MUST** read [`CONTEXT.md`](CONTEXT.md). We enforce:
-- Strict typing (mypy + TypeScript strict mode)
-- Comprehensive error handling (Sentry + structured logging)
-- Zero-tolerance for committing secrets
-- All tests must pass before merge
+# 4. Engine Directives
+APP_MODE=production # Changes from fallback logic to live API processing
+ENABLE_AI_FIREWALL=true
+ENABLE_SELF_HEALING=true
+```
 
 ---
 
-<div align="center">
-  <p><strong>Built with ❤️ for speed, scale, and intelligence.</strong></p>
-  <p><em>by Mohammed Inayat Hussain Qureshi — Principal AI/Software Engineer</em></p>
-  <br>
-  <img src="https://img.shields.io/badge/python-3.11+-blue?style=flat-square&logo=python" />
-  <img src="https://img.shields.io/badge/next.js-14-black?style=flat-square&logo=next.js" />
-  <img src="https://img.shields.io/badge/fastapi-0.115-green?style=flat-square&logo=fastapi" />
-  <img src="https://img.shields.io/badge/crewai-agents-orange?style=flat-square" />
-  <img src="https://img.shields.io/badge/turso-libsql-purple?style=flat-square" />
-  <img src="https://img.shields.io/badge/docker-compose-blue?style=flat-square&logo=docker" />
-</div>
+## 👨‍💻 About The Developer
+
+<img src="https://img.shields.io/badge/Principal_AI_Engineer-Mohammed_Inayat_Hussain_Qureshi-000000?style=for-the-badge&logo=github&logoColor=white" />
+
+**Mohammed Inayat Hussain Qureshi** is a **Senior AI/Software Engineer with over 30 years of deep industry expertise**. He specializes in bridging the gap between advanced multi-agent machine learning models and high-concurrency Web3/SaaS platforms. 
+
+As the primary architect of **TeamGenie AI**, Mohammed has engineered a highly-scalable, monetization-ready platform utilizing Next.js, FastAPI, CrewAI, and Google OR-Tools. His algorithmic philosophy centers on zero-hallucination architectures, predictive edge-computing, and building flawless, gamified UI/UX ecosystems that delight end-users.
+
+For business inquiries, architectural consultations, or patent discussions, refer to the included Deep Dive internal documentation.
+
+---
+
+## 🤝 Contribution Guidelines
+
+This is a **PRIVATE PATENT PROJECT**. Internal contributors must adhere to strict guidelines before pushing code:
+1. You **MUST** read and understand [`CONTEXT.md`](CONTEXT.md) before making structural changes.
+2. Ensure you have run formatting checks (`Ruff`, `Black`, `ESLint`).
+3. No secrets (`.env` variables, API Keys) can ever be included in your commits.
+4. Run `pytest` locally to ensure all backend tests remain green.
+
+---
+
+## 📜 License & Intellectual Property
+
+**All Rights Reserved. Copyright (c) 2026 Mohammed Inayat Hussain Qureshi.**
+
+This source code is proprietary and confidential. Modification, distribution, external linking, or utilization of this repository without express written permission is strictly prohibited and protected under pending international algorithms patents.
