@@ -49,9 +49,13 @@ export default {
       );
     }
 
+    // Compute cache key once — used by both the cache-check and cache-store blocks below
+    const cacheKey = (request.method === 'GET' && url.pathname.startsWith('/api/'))
+      ? `edge:${url.pathname}${url.search}`
+      : null;
+
     // Edge cache for GET /api/* requests
-    if (request.method === 'GET' && url.pathname.startsWith('/api/')) {
-      const cacheKey = `edge:${url.pathname}${url.search}`;
+    if (cacheKey) {
       const cached = await env.KV_CACHE.get(cacheKey);
       if (cached) {
         return new Response(cached, {
@@ -75,7 +79,7 @@ export default {
     const response = await fetch(originRequest);
 
     // Cache successful GET responses for 5 minutes
-    if (request.method === 'GET' && response.ok) {
+    if (cacheKey && response.ok) {
       const body = await response.text();
       // Don't await KV put — fire and forget for latency
       env.KV_CACHE.put(cacheKey, body, { expirationTtl: 300 }).catch(() => {});

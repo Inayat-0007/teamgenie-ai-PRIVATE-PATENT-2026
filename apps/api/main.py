@@ -132,8 +132,8 @@ async def add_request_metadata(request: Request, call_next):
 from middleware.error_handler import error_handler_middleware
 app.middleware("http")(error_handler_middleware)
 
-# 4. Self-healing (experimental — can be disabled)
-if os.getenv("ENABLE_SELF_HEALING", "true").lower() == "true":
+# 4. Self-healing (experimental — opt-in, disabled by default)
+if os.getenv("ENABLE_SELF_HEALING", "false").lower() == "true":
     from middleware.self_healing import self_healing_middleware
     app.middleware("http")(self_healing_middleware)
 
@@ -141,8 +141,8 @@ if os.getenv("ENABLE_SELF_HEALING", "true").lower() == "true":
 from middleware.auth import verify_jwt
 app.middleware("http")(verify_jwt)
 
-# 6. AI Firewall — block malicious payloads (can be disabled)
-if os.getenv("ENABLE_AI_FIREWALL", "true").lower() == "true":
+# 6. AI Firewall — block malicious payloads (opt-in, disabled by default)
+if os.getenv("ENABLE_AI_FIREWALL", "false").lower() == "true":
     from security.ai_firewall import ai_firewall_check
     app.middleware("http")(ai_firewall_check)
 

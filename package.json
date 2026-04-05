@@ -24,8 +24,8 @@
     "dev:web": "turbo dev --filter=@teamgenie/web",
     "dev:api": "cd apps/api && uvicorn main:app --reload --port 8000",
     "dev:mobile": "turbo dev --filter=@teamgenie/mobile",
-    "db:migrate": "cd apps/api && python -m alembic upgrade head",
-    "db:seed": "cd apps/api && python scripts/seed-db.py"
+    "db:migrate": "echo 'Run SQL migrations via Turso CLI: turso db shell $TURSO_DATABASE_URL < db/migrations/001_initial_schema.sql'",
+    "db:seed": "echo 'Seed data not yet implemented. See db/migrations/001_initial_schema.sql for the schema.'"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
