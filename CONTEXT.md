@@ -412,11 +412,23 @@ curl -X POST http://localhost:8000/api/team/generate \
 
 **Problem Discovered:** FastAPI imports middleware modules at module load time. If `load_dotenv()` is not the *first* call in `main.py`, the JWT auth middleware reads `os.getenv("PYTHON_ENV")` as `None` — causing ALL requests to return 401 regardless of dev-bypass logic.
 
-**Fix Applied:**
+**Before (Broken):**
 ```python
-# apps/api/main.py — MUST be before any imports that read os.getenv()
+# apps/api/main.py — WRONG: imports happen before env vars are loaded
+from fastapi import FastAPI
+from middleware.auth import verify_jwt  # ← reads os.getenv("PYTHON_ENV") → None here
 from dotenv import load_dotenv
-load_dotenv()
+load_dotenv()  # Too late — middleware already saw None
+```
+
+**After (Fixed):**
+```python
+# apps/api/main.py — CORRECT: load_dotenv() is the very first operation
+from dotenv import load_dotenv
+load_dotenv()  # ← MUST run before any os.getenv() call anywhere
+
+from fastapi import FastAPI
+from middleware.auth import verify_jwt  # ← Now reads correct PYTHON_ENV value
 ```
 
 ### 11.2 The Middleware Execution Order

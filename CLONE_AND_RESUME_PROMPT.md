@@ -61,10 +61,10 @@ Response (4ms in DEMO mode)
 - **Team Generation**: 🟢 WORKS (4ms, heuristic/greedy mode, 11 players)
 - **Auth**: 🟢 Dev-bypass active (`PYTHON_ENV=development` → `dev_user` auto-assigned)
 - **Redis/Rate Limit**: 🟡 Gracefully bypassed (no Redis connection)
-- **AI Firewall**: ⬜ Disabled (`ENABLE_AI_FIREWALL=false` in dev)
+- **AI Firewall**: 🟡 Disabled (`ENABLE_AI_FIREWALL=false` in dev)
 - **Real LLMs**: 🔴 Stubs (need `GEMINI_API_KEY` + `CLAUDE_API_KEY`)
 - **Database**: 🔴 Stubs (need `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN`)
-- **CI/CD**: ✅ All green (linting + pytest + security scan passing)
+- **CI/CD**: 🟢 All green (linting + pytest + security scan passing)
 
 ### What Needs to Happen for Production (Ordered Priority)
 1. **P0**: Inject `GEMINI_API_KEY`, `TURSO_DATABASE_URL`, `SUPABASE_URL` into `.env`
