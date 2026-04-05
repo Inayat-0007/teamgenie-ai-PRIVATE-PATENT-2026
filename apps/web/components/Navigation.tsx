@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Zap, Home, Users, Search, BrainCircuit, Database } from "lucide-react";
+import { Zap, Home, Users, Search, BrainCircuit, Database, CreditCard } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
@@ -14,6 +14,7 @@ export function Navigation() {
     { href: "/team/generate", label: "PRO Gen", icon: Zap },
     { href: "/chat", label: "Elite Terminal", icon: BrainCircuit },
     { href: "/matches", label: "Matches", icon: Search },
+    { href: "/pricing", label: "Pricing", icon: CreditCard },
     { href: "/players", label: "Players", icon: Database },
     { href: "/history", label: "My Squads", icon: Users },
   ];
