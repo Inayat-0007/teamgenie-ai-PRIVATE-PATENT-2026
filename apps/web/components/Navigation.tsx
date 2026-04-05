@@ -11,7 +11,8 @@ export function Navigation() {
 
   const routes = [
     { href: "/", label: "Home", icon: Home },
-    { href: "/team/generate", label: "Auto-Generate", icon: Zap },
+    { href: "/team/generate", label: "PRO Gen", icon: Zap },
+    { href: "/chat", label: "Elite Terminal", icon: BrainCircuit },
     { href: "/matches", label: "Matches", icon: Search },
     { href: "/players", label: "Players", icon: Database },
     { href: "/history", label: "My Squads", icon: Users },
