@@ -1,186 +1,106 @@
-'use client';
+"use client";
 
-import { useCallback, useState } from 'react';
-import { motion, useReducedMotion } from 'framer-motion';
+import { motion } from "framer-motion";
+import Link from "next/link";
+import { ArrowRight, Bot, Shield, Zap, Search } from "lucide-react";
 
-// --- Data Constants (single source of truth) ---
-const STATS = [
-  { label: 'Response Time', value: '<5s', icon: '⚡' },
-  { label: 'Accuracy', value: '72%', icon: '🎯' },
-  { label: 'Uptime', value: '99.95%', icon: '🟢' },
-  { label: 'Users', value: '10K+', icon: '👥' },
-] as const;
-
-const AGENTS = [
-  {
-    step: '01',
-    title: 'Budget Optimizer',
-    desc: 'OR-Tools ILP solver maximizes points within ₹100 budget constraint.',
-    icon: '🤖',
-  },
-  {
-    step: '02',
-    title: 'Differential Expert',
-    desc: 'RAG pipeline finds low-ownership gems with high upside potential.',
-    icon: '💎',
-  },
-  {
-    step: '03',
-    title: 'Risk Manager',
-    desc: 'Monte Carlo simulation balances risk/reward for your play style.',
-    icon: '🛡️',
-  },
-] as const;
-
-// --- Animation Variants ---
-const fadeInUp = {
-  hidden: { opacity: 0, y: 30 },
-  visible: { opacity: 1, y: 0 },
-};
-
-const staggerContainer = {
-  hidden: {},
-  visible: { transition: { staggerChildren: 0.15 } },
-};
-
-export default function HomePage() {
-  const prefersReducedMotion = useReducedMotion();
-
-  // Demo CTA state
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  const handleGenerate = useCallback(async () => {
-    setIsGenerating(true);
-    // TODO: Navigate to team generation page
-    setTimeout(() => setIsGenerating(false), 2000);
-  }, []);
-
+export default function Home() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-16 relative overflow-hidden">
-      {/* Background ambient glow orbs */}
-      <div className="absolute top-1/4 -left-32 w-96 h-96 bg-indigo-600/10 rounded-full blur-[128px] pointer-events-none" aria-hidden="true" />
-      <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-cyan-500/10 rounded-full blur-[128px] pointer-events-none" aria-hidden="true" />
+    <div className="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center overflow-hidden">
+      {/* Background Orbs */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-indigo-600/20 rounded-full blur-[128px] -z-10" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-600/20 rounded-full blur-[128px] -z-10" />
 
-      {/* Hero Section */}
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={prefersReducedMotion ? {} : fadeInUp}
-        transition={{ duration: 0.8, ease: 'easeOut' }}
-        className="text-center max-w-4xl mx-auto relative z-10"
-      >
-        {/* Badge */}
+      <main className="flex-1 flex flex-col items-center justify-center text-center px-4 w-full max-w-5xl mx-auto pt-20 pb-32">
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ delay: 0.2 }}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-sm mb-8"
-          role="status"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="inline-flex items-center space-x-2 glass-panel px-4 py-2 rounded-full mb-8 border-indigo-500/30 text-indigo-300"
         >
-          <span className="w-2 h-2 rounded-full bg-green-400 pulse-live" aria-hidden="true" />
-          AI-Powered Fantasy Sports Intelligence
+          <span className="flex h-2 w-2 rounded-full bg-indigo-500 animate-pulse"></span>
+          <span className="text-sm font-medium">Master Doctrine v2.0 Live Engine</span>
         </motion.div>
 
-        {/* Title */}
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 leading-[1.1]">
-          Build{' '}
-          <span className="gradient-text">Winning Teams</span>
-          <br />
-          in Under 5 Seconds
-        </h1>
+        <motion.h1
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1 }}
+          className="text-5xl md:text-7xl font-extrabold tracking-tight mb-8 leading-tight"
+        >
+          Dominate Fantasy Sports <br />
+          with <span className="text-gradient">Multi-Agent AI</span>
+        </motion.h1>
 
-        {/* Subtitle */}
-        <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-          Three AI agents analyze millions of data points and collaborate to generate
-          your optimal fantasy cricket team. 72% prediction accuracy, backed by data.
-        </p>
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-12"
+        >
+          Three autonomous CrewAI agents collaborate to generate mathematically perfect, 
+          risk-adjusted fantasy rosters in under 4 milliseconds using OR-Tools ILP optimization.
+        </motion.p>
 
-        {/* CTA Buttons */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            aria-label="Generate a free fantasy team"
-            id="cta-generate"
-            className="px-8 py-4 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 text-white font-semibold text-lg shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 transition-all disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-gray-950"
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6"
+        >
+          <Link
+            href="/team/generate"
+            className="group relative px-8 py-4 bg-white text-slate-950 font-bold rounded-full overflow-hidden transition-all hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.3)]"
           >
-            {isGenerating ? (
-              <span className="inline-flex items-center gap-2">
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Generating...
-              </span>
-            ) : (
-              '🏏 Generate Team — Free'
-            )}
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            aria-label="View a demo of TeamGenie AI"
-            id="cta-demo"
-            className="px-8 py-4 rounded-xl glass-card text-white font-semibold text-lg hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/30 focus:ring-offset-2 focus:ring-offset-gray-950"
+            <span className="relative z-10 flex items-center space-x-2">
+              <span>Generate Team Now</span>
+              <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
+            </span>
+          </Link>
+          
+          <Link
+            href="/matches"
+            className="px-8 py-4 glass-panel text-white font-medium rounded-full hover:bg-slate-800/80 transition-colors"
           >
-            View Demo →
-          </motion.button>
-        </div>
-      </motion.div>
+            Explore Matches
+          </Link>
+        </motion.div>
 
-      {/* Stats Bar */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="glass-card glow p-8 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl w-full relative z-10"
-        role="list"
-        aria-label="Platform statistics"
-      >
-        {STATS.map((stat) => (
-          <div key={stat.label} className="text-center" role="listitem">
-            <div className="text-2xl mb-1" aria-hidden="true">{stat.icon}</div>
-            <div className="text-2xl md:text-3xl font-bold gradient-text">{stat.value}</div>
-            <div className="text-sm text-gray-500 mt-1">{stat.label}</div>
-          </div>
-        ))}
-      </motion.div>
-
-      {/* How It Works */}
-      <motion.section
-        initial="hidden"
-        whileInView="visible"
-        viewport={{ once: true, amount: 0.3 }}
-        variants={staggerContainer}
-        className="mt-24 max-w-4xl w-full relative z-10"
-        aria-labelledby="how-it-works-heading"
-      >
-        <h2 id="how-it-works-heading" className="text-3xl font-bold text-center mb-12">
-          How <span className="gradient-text">TeamGenie</span> Works
-        </h2>
-        <div className="grid md:grid-cols-3 gap-6">
-          {AGENTS.map((item) => (
-            <motion.article
-              key={item.step}
-              variants={fadeInUp}
-              whileHover={{ y: -4, scale: 1.02 }}
-              className="glass-card p-6 cursor-default transition-shadow hover:glow"
-            >
-              <div className="text-4xl mb-4" aria-hidden="true">{item.icon}</div>
-              <div className="text-xs text-indigo-400 font-mono mb-2">AGENT {item.step}</div>
-              <h3 className="text-xl font-semibold mb-2">{item.title}</h3>
-              <p className="text-gray-400 text-sm leading-relaxed">{item.desc}</p>
-            </motion.article>
+        {/* Feature Grid */}
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.5 }}
+          className="grid md:grid-cols-3 gap-6 mt-32 w-full text-left"
+        >
+          {[
+            {
+              icon: Zap,
+              title: "Budget Optimizer (ILP)",
+              desc: "Google OR-Tools Integer Linear Programming mathematically guarantees maximum projected points under ₹100 cap.",
+              color: "text-amber-400"
+            },
+            {
+              icon: Search, // Using Search from lucide instead of Brain
+              title: "Differential Expert",
+              desc: "RAG pipeline queries semantic vector spaces to identify <25% ownership players with explosive upside.",
+              color: "text-emerald-400"
+            },
+            {
+              icon: Shield,
+              title: "Risk Manager",
+              desc: "Monte-Carlo variance profiles determine the statistically safest Captain and Vice-Captain choices.",
+              color: "text-rose-400"
+            }
+          ].map((feat, i) => (
+            <div key={i} className="glass-panel p-8 rounded-2xl hover:bg-slate-800/40 transition-colors">
+              <feat.icon className={`h-10 w-10 mb-4 ${feat.color}`} />
+              <h3 className="text-xl font-bold mb-2">{feat.title}</h3>
+              <p className="text-slate-400 text-sm leading-relaxed">{feat.desc}</p>
+            </div>
           ))}
-        </div>
-      </motion.section>
-
-      {/* Footer */}
-      <footer className="mt-24 mb-8 text-center text-gray-600 text-sm relative z-10">
-        Built with ❤️ in Bhopal, India 🇮🇳 | © {new Date().getFullYear()} TeamGenie AI
-      </footer>
-    </main>
+        </motion.div>
+      </main>
+    </div>
   );
 }
