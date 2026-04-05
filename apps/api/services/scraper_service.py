@@ -240,7 +240,6 @@ class ScraperService:
         )
 
         # Cache the assembled block for 30 minutes
-        _set_cached(match_id, "full_context")
         _match_cache[_cache_key(match_id, "full_context")] = {
             "data": context_block,
             "ts": time.time(),
