@@ -17,19 +17,21 @@
   </p>
 
   <p>
-    <img src="https://img.shields.io/badge/Engine-v2.0.0-success?style=for-the-badge&logo=rocket" alt="Engine" />
+    <img src="https://img.shields.io/badge/Engine-v3.0.0-success?style=for-the-badge&logo=rocket" alt="Engine" />
     <img src="https://img.shields.io/badge/Tests-9%2F9_Passing-brightgreen?style=for-the-badge&logo=checkmarx" alt="Tests" />
     <img src="https://img.shields.io/badge/Latency-4ms-blue?style=for-the-badge&logo=speedtest" alt="Latency" />
     <img src="https://img.shields.io/badge/Agents-3_CrewAI-orange?style=for-the-badge&logo=openai" alt="Agents" />
     <img src="https://img.shields.io/badge/CI-All_Green-brightgreen?style=for-the-badge&logo=github-actions" alt="CI" />
+    <img src="https://img.shields.io/badge/JIT-DuckDuckGo-blueviolet?style=for-the-badge&logo=duckduckgo" alt="JIT" />
+    <img src="https://img.shields.io/badge/Tiers-Free%20|%20Pro%20|%20Elite-gold?style=for-the-badge&logo=stripe" alt="Tiers" />
   </p>
 </div>
 
 ---
 
-## 📊 VERSION COMPARISON: v1.0 → v2.0 (Master Doctrine Upgrade)
+## 📊 VERSION HISTORY: v1.0 → v2.0 → v3.0
 
-> This project has evolved through **18+ commits** from an initial scaffold to a production-grade, self-aware AI platform.
+> This project has evolved through **25+ commits** across **9 phases** from an initial scaffold to a production-grade, monetizable AI SaaS platform.
 
 ### 🔄 What Changed — The Full Before vs After
 
@@ -126,6 +128,9 @@
 | **v1.1** (CI Green) | Apr 4, 18:00 | `145af0f`–`abb6dcc` | All CI passing — merged PR #1 and PR #2 |
 | **v1.5** (Full Stack) | Apr 4, 21:00 | `6c1df37` | Full local deployment verified. Both servers running. |
 | **v2.0** (Doctrine) | Apr 5, 03:40 | `3a4adc2` | **Master Doctrine v2.0 — 13 production upgrades, 9/9 tests** |
+| **v2.5** (Addictive UI) | Apr 5, 04:00 | `be6c26d` | Phase 3: Framer Motion spring physics, ScoutFeed, 3-column dashboard |
+| **v2.7** (Elite UI) | Apr 5, 06:00 | `b837539` | Phase 4: 3-Tier Monetization Frontend, `/chat` terminal, paywall hooks |
+| **v3.0** (Production) | Apr 5, 07:00 | `latest` | **Phases 5-9: JIT DDG Scraper, Subscriptions, Weather/Toss, Prometheus, Gunicorn** |
 
 ---
 

@@ -44,6 +44,7 @@ llama-index>=0.10
 # --- Scraping ---
 playwright>=1.40
 beautifulsoup4>=4.12
+duckduckgo-search>=6.0
 
 # --- Optimization ---
 ortools>=9.8

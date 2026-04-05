@@ -11,6 +11,8 @@ export default function GenerateTeamPage() {
   const [matchId, setMatchId] = useState("ipl_2026_01");
   const [budget, setBudget] = useState(100);
   const [riskLevel, setRiskLevel] = useState("balanced");
+  const [tossWinner, setTossWinner] = useState("");
+  const [tossDecision, setTossDecision] = useState("");
   
   const [isGenerating, setIsGenerating] = useState(false);
   const [loadingAgent, setLoadingAgent] = useState("");
@@ -25,6 +27,9 @@ export default function GenerateTeamPage() {
 
     try {
       // Fast, Addictive Loading Simulation sequence
+      setLoadingAgent("JIT Scraper (DuckDuckGo)");
+      await new Promise(r => setTimeout(r, 300));
+
       setLoadingAgent("Budget Optimizer (ILP)");
       await new Promise(r => setTimeout(r, 400));
       
@@ -37,7 +42,9 @@ export default function GenerateTeamPage() {
       const response = await aiKit.generateTeam({
         match_id: matchId,
         budget,
-        risk_level: riskLevel
+        risk_level: riskLevel,
+        ...(tossWinner && { toss_winner: tossWinner }),
+        ...(tossDecision && { toss_decision: tossDecision }),
       });
 
       setResult(response.team);
@@ -121,6 +128,41 @@ export default function GenerateTeamPage() {
                   {error}
                 </div>
               )}
+
+              {/* Phase 7: Toss Intelligence */}
+              <div className="space-y-3 pt-2 border-t border-slate-800/50">
+                <label className="text-sm font-medium text-slate-300 flex items-center space-x-2">
+                  <span>⚡ Toss Result</span>
+                  <span className="text-[10px] bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded-full">LIVE</span>
+                </label>
+                <select
+                  value={tossWinner}
+                  onChange={(e) => setTossWinner(e.target.value)}
+                  className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-amber-500/50 appearance-none"
+                >
+                  <option value="">Unknown / Not yet</option>
+                  <option value="Team A">Team A won toss</option>
+                  <option value="Team B">Team B won toss</option>
+                </select>
+                {tossWinner && (
+                  <div className="grid grid-cols-2 gap-2">
+                    {["bat", "bowl"].map(d => (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setTossDecision(d)}
+                        className={`py-2 rounded-xl border text-sm font-medium transition-all capitalize ${
+                          tossDecision === d
+                            ? 'bg-amber-500/20 border-amber-500/50 text-amber-300'
+                            : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        Chose to {d}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <button
                 type="submit"

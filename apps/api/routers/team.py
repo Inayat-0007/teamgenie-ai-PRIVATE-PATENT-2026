@@ -48,6 +48,11 @@ class TeamGenerateRequest(BaseModel):
     budget: float = Field(default=100.0, ge=0, le=100, description="Team budget constraint (₹)")
     risk_level: str = Field(default="balanced", pattern="^(safe|balanced|aggressive)$")
     user_preferences: Optional[UserPreferences] = None
+    toss_winner: Optional[str] = Field(default=None, description="Team that won the toss")
+    toss_decision: Optional[str] = Field(default=None, pattern="^(bat|bowl)$", description="Toss decision")
+    team_a: Optional[str] = Field(default=None, description="Team A name for JIT search")
+    team_b: Optional[str] = Field(default=None, description="Team B name for JIT search")
+    venue: Optional[str] = Field(default=None, description="Venue key for weather lookup")
 
 
 class PlayerResponse(BaseModel):
@@ -125,6 +130,29 @@ async def generate_team(
     )
 
     try:
+        # Phase 0: Subscription Tier Check (Phase 6)
+        user_tier = getattr(http_request.state, "user_tier", "free")
+        try:
+            from services.subscription_service import subscription_service
+            subscription_service.check_generation_quota(user_id=request_id, tier=user_tier)
+        except ImportError:
+            pass  # Subscription service not yet deployed
+        except Exception as quota_err:
+            raise HTTPException(status_code=429, detail={"code": "quota_exceeded", "message": str(quota_err)})
+
+        # Phase 1: JIT Intelligence Injection (Phase 5)
+        jit_context = ""
+        try:
+            from services.scraper_service import scraper_service
+            jit_context = await scraper_service.get_match_context(
+                match_id=request.match_id,
+                team_a=request.team_a or "",
+                team_b=request.team_b or "",
+                venue=request.venue or "default",
+            )
+        except Exception as jit_err:
+            logger.warning("jit.scraper_failed", error=str(jit_err))
+
         with timer.stage("ai_pipeline"):
             from services.ai_service import generate_team_with_agents
 
@@ -133,6 +161,9 @@ async def generate_team(
                 budget=request.budget,
                 risk_level=request.risk_level,
                 preferences=request.user_preferences.model_dump() if request.user_preferences else None,
+                jit_context=jit_context,
+                toss_winner=request.toss_winner,
+                toss_decision=request.toss_decision,
             )
 
         timing_data = timer.export()

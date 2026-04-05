@@ -1,36 +1,69 @@
-FROM python:3.11-slim AS base
+# ============================================
+# TeamGenie AI — Production Dockerfile
+# Phase 8: Multi-stage build, Gunicorn, health probes
+# ============================================
 
-# Prevent Python from writing .pyc files and enable unbuffered output
+# ----- Stage 1: Builder -----
+FROM python:3.11-slim AS builder
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-WORKDIR /app
+WORKDIR /build
 
-# System deps for Playwright & ML (separate layer for caching)
+# System deps for compilation
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl build-essential && \
+    build-essential curl && \
     rm -rf /var/lib/apt/lists/*
 
-# Python deps (separate layer — only rebuilds when requirements change)
 COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt || \
     pip install --no-cache-dir fastapi uvicorn pydantic pydantic-settings python-dotenv \
-        python-multipart python-jose httpx structlog tenacity email-validator
+        python-multipart python-jose httpx structlog tenacity email-validator \
+        duckduckgo-search
 
-# Install Playwright browsers (non-fatal — app works without browsers in most environments)
-RUN playwright install chromium --with-deps || true
+# Install gunicorn for production workers
+RUN pip install --no-cache-dir gunicorn
 
-# App code (changes most frequently — last layer)
+
+# ----- Stage 2: Production Runtime -----
+FROM python:3.11-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8000 \
+    WORKERS=4
+
+WORKDIR /app
+
+# Copy Python packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Install runtime-only system deps (curl for healthcheck)
+RUN apt-get update && apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy application code
 COPY . .
 
 # Non-root user for security
 RUN adduser --disabled-password --no-create-home appuser
 USER appuser
 
-EXPOSE 8000
+EXPOSE ${PORT}
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+# Kubernetes-compatible health probes
+HEALTHCHECK --interval=15s --timeout=3s --start-period=10s --retries=3 \
     CMD ["curl", "-f", "http://localhost:8000/health"]
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+# Production: Gunicorn with Uvicorn workers
+CMD ["gunicorn", "main:app", \
+     "--bind", "0.0.0.0:8000", \
+     "--workers", "4", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--timeout", "120", \
+     "--graceful-timeout", "30", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-"]

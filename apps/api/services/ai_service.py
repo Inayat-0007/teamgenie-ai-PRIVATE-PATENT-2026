@@ -36,6 +36,9 @@ async def generate_team_with_agents(
     budget: float = _DEFAULT_BUDGET,
     risk_level: str = "balanced",
     preferences: Optional[dict] = None,
+    jit_context: str = "",
+    toss_winner: Optional[str] = None,
+    toss_decision: Optional[str] = None,
 ) -> dict:
     """
     Generate optimal fantasy team using CrewAI multi-agent system.
@@ -56,6 +59,8 @@ async def generate_team_with_agents(
         budget=budget,
         risk_level=risk_level,
         mode=settings.APP_MODE.value,
+        has_jit=bool(jit_context),
+        has_toss=bool(toss_winner),
     )
 
     # Phase 0: Fetch available players
@@ -72,10 +77,19 @@ async def generate_team_with_agents(
     # Phase 0.5: Enrich with statistical projections (Upgrade #8)
     enriched_players = await _enrich_with_projections(players)
 
+    # Phase 0.8: JIT Context Injection (Phase 5 Upgrade)
+    # If toss info is available, inject it into the context
+    if toss_winner and toss_decision:
+        toss_intel = f"\n[TOSS RESULT]: {toss_winner} won the toss and chose to {toss_decision}.\n"
+        jit_context = jit_context + toss_intel if jit_context else toss_intel
+
+    if jit_context:
+        logger.info("jit.injected", chars=len(jit_context))
+
     # Phase 1: Run Budget Optimizer + Differential Expert in parallel
     budget_result, differential_result = await asyncio.gather(
         _run_budget_optimizer(enriched_players, budget, preferences),
-        _run_differential_expert(enriched_players, match_id),
+        _run_differential_expert(enriched_players, match_id, jit_context=jit_context),
     )
 
     # Phase 2: Risk Manager runs after (needs both outputs)
@@ -107,6 +121,7 @@ async def generate_team_with_agents(
                 "reasoning", f"Balanced for {risk_level} risk profile."
             ),
         },
+        "jit_intelligence": jit_context[:500] if jit_context else None,
     }
 
 
@@ -230,8 +245,8 @@ def _solve_greedy(players: list[dict], budget: float) -> tuple:
     return selected, total_cost, total_points
 
 
-async def _run_differential_expert(players: list[dict], match_id: str) -> dict:
-    """Agent 2: Find low-ownership, high-upside players."""
+async def _run_differential_expert(players: list[dict], match_id: str, jit_context: str = "") -> dict:
+    """Agent 2: Find low-ownership, high-upside players. Uses JIT intel."""
     differentials = [
         p
         for p in players

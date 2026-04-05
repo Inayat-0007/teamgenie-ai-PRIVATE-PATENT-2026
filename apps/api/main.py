@@ -41,6 +41,10 @@ except ImportError:
     sentry_sdk = None  # type: ignore[assignment]
 
 from routers import auth, match, player, team, user
+try:
+    from routers import metrics as metrics_router
+except ImportError:
+    metrics_router = None  # type: ignore
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -155,6 +159,8 @@ app.include_router(team.router, prefix="/api/team", tags=["Team Generation"])
 app.include_router(player.router, prefix="/api/player", tags=["Player Insights"])
 app.include_router(match.router, prefix="/api/match", tags=["Match Data"])
 app.include_router(user.router, prefix="/api/user", tags=["User Management"])
+if metrics_router:
+    app.include_router(metrics_router.router, tags=["Monitoring"])
 
 
 # ---------------------------------------------------------------------------
