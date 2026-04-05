@@ -4,6 +4,8 @@ User Management Router — Profile, preferences, data export, GDPR/DPDP.
 
 from __future__ import annotations
 
+import datetime
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -41,11 +43,19 @@ async def update_profile(request: UserUpdateRequest):
 async def export_data(request: Request):
     """Export all user data (GDPR/DPDP Act compliance)."""
     user_id = getattr(request.state, "user_id", "unknown")
-    # TODO: Generate JSON export of all user data
+    # TODO: Generate real JSON export and upload to a signed storage URL when DB is connected.
+    # For now, return a structured placeholder with valid timestamps so callers can parse the response.
+    requested_at = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0).isoformat()
+    expires_at = (
+        datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=24)
+    ).replace(microsecond=0).isoformat()
     return {
         "user_id": user_id,
-        "export_url": "",
-        "expires_at": "",
+        "status": "pending",
+        "message": "Data export is not yet available in DEMO mode. It will be ready once the database is connected.",
+        "export_url": None,
+        "requested_at": requested_at,
+        "expires_at": expires_at,
         "format": "json",
     }
 

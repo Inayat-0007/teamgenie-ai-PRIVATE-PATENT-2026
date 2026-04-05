@@ -65,7 +65,11 @@ log "🔍 Running frontend lint..."
 # ------
 # Step 3: Deploy backend (Render auto-deploys via git push)
 # ------
-log "📡 Backend: Render auto-deploys from ${ENV == 'production' ? 'main' : 'develop'} branch"
+if [[ "$ENV" == "production" ]]; then
+    log "📡 Backend: Render auto-deploys from main branch"
+else
+    log "📡 Backend: Render auto-deploys from develop branch"
+fi
 
 # ------
 # Step 4: Deploy frontend

@@ -48,12 +48,7 @@ async def rate_limit_middleware(request: Request, call_next):
             remaining = max(0, limit - current)
             reset_in = 60 - int(time.time() % 60)
 
-            # Attach standard rate-limit headers to response
-            response = await call_next(request)
-            response.headers["X-RateLimit-Limit"] = str(limit)
-            response.headers["X-RateLimit-Remaining"] = str(remaining)
-            response.headers["X-RateLimit-Reset"] = str(reset_in)
-
+            # Block over-limit requests BEFORE serving — prevents wasted compute
             if current > limit:
                 logger.warning("rate_limit.exceeded", ip=identifier, used=current, limit=limit)
                 raise HTTPException(
@@ -67,6 +62,12 @@ async def rate_limit_middleware(request: Request, call_next):
                     },
                     headers={"Retry-After": str(reset_in)},
                 )
+
+            # Attach standard rate-limit headers to response
+            response = await call_next(request)
+            response.headers["X-RateLimit-Limit"] = str(limit)
+            response.headers["X-RateLimit-Remaining"] = str(remaining)
+            response.headers["X-RateLimit-Reset"] = str(reset_in)
 
             return response
 
