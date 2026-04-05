@@ -41,6 +41,18 @@ except ImportError:
     sentry_sdk = None  # type: ignore[assignment]
 
 from routers import auth, match, player, team, user
+
+# ---------------------------------------------------------------------------
+# Metrics — prometheus_client middleware + /metrics endpoint (issue #3/#9 fix)
+# ---------------------------------------------------------------------------
+try:
+    from middleware.metrics import metrics_middleware, metrics_endpoint
+    _metrics_middleware_available = True
+except Exception:
+    _metrics_middleware_available = False
+    metrics_middleware = None  # type: ignore[assignment]
+    metrics_endpoint = None  # type: ignore[assignment]
+
 try:
     from routers import metrics as metrics_router
 except ImportError:
@@ -150,6 +162,10 @@ if os.getenv("ENABLE_AI_FIREWALL", "false").lower() == "true":
 from middleware.rate_limit import rate_limit_middleware
 app.middleware("http")(rate_limit_middleware)
 
+# 8. Prometheus metrics — record every request (no-op if prometheus_client not installed)
+if _metrics_middleware_available and metrics_middleware is not None:
+    app.middleware("http")(metrics_middleware)
+
 
 # ---------------------------------------------------------------------------
 # Routers
@@ -159,7 +175,14 @@ app.include_router(team.router, prefix="/api/team", tags=["Team Generation"])
 app.include_router(player.router, prefix="/api/player", tags=["Player Insights"])
 app.include_router(match.router, prefix="/api/match", tags=["Match Data"])
 app.include_router(user.router, prefix="/api/user", tags=["User Management"])
-if metrics_router:
+
+# /metrics — prefer the prometheus_client (generate_latest) version; fall back to in-memory
+if _metrics_middleware_available and metrics_endpoint is not None:
+    from fastapi import APIRouter as _APIRouter
+    _metrics_api_router = _APIRouter()
+    _metrics_api_router.add_api_route("/metrics", metrics_endpoint, methods=["GET"], tags=["Monitoring"])
+    app.include_router(_metrics_api_router)
+elif metrics_router:
     app.include_router(metrics_router.router, tags=["Monitoring"])
 
 

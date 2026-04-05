@@ -52,6 +52,7 @@ ortools>=9.8
 # --- Monitoring ---
 sentry-sdk[fastapi]>=1.40
 posthog>=3.3
+prometheus-client>=0.20
 opentelemetry-api>=1.22
 opentelemetry-sdk>=1.22
 opentelemetry-instrumentation-fastapi>=0.43b0
