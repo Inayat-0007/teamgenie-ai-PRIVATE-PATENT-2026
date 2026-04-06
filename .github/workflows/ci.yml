@@ -37,9 +37,9 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt || pip install fastapi uvicorn pydantic pydantic-settings python-dotenv python-multipart python-jose httpx structlog tenacity pytest pytest-cov pytest-asyncio email-validator
-          pip install black ruff
+          pip install --upgrade pip setuptools wheel uv
+          uv pip install --system -r requirements.txt || pip install fastapi uvicorn pydantic pydantic-settings python-dotenv python-multipart python-jose httpx structlog tenacity pytest pytest-cov pytest-asyncio email-validator
+          uv pip install --system black ruff
 
       - name: Lint (Ruff — fast)
         run: ruff check . || true
