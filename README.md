@@ -112,44 +112,53 @@ graph TD
     classDef db fill:#312e81,stroke:#4f46e5,stroke-width:2px,color:#fff
     classDef new fill:#14532d,stroke:#22c55e,stroke-width:3px,color:#fff
 
-    subgraph Clients
+    subgraph clients_layer [Clients]
         W[Next.js 14 App Router]:::client
         M[React Native Expo Mobile]:::client
     end
 
-    subgraph CDN & Security Edge
+    subgraph security_edge [CDN & Security Edge]
         CF[Cloudflare Edge Worker]:::edge
         FW[FastAPI AI Firewall]:::api
     end
 
-    subgraph Core Backend Routing Layer
+    subgraph core_layer [Core Backend Routing Layer]
         API[FastAPI Main Router]:::api
         PAY[Monetization & Tier Quotas]:::new
-        METRICS["Prometheus /metrics"]:::new
+        METRICS["Prometheus Metrics"]:::new
     end
 
-    subgraph AI Intelligence Engine v3.0.0
+    subgraph ai_engine [AI Intelligence Engine v3.0.0]
         JIT["JIT DuckDuckGo Scraper<br>Injuries/Pitch/Weather"]:::new
         B["Agent 1: Budget Optimizer<br>OR-Tools ILP"]:::ai
         D["Agent 2: Differential Expert<br>RAG + Ownership Stats"]:::ai
         R["Agent 3: Risk Manager<br>Captain/VC Assignment"]:::ai
     end
 
-    subgraph Infrastructure
+    subgraph infrastructure [Infrastructure]
         T[(Turso SQLite Edge DB)]:::db
         P[(Pinecone Vector DB)]:::db
         U[(Upstash Redis Cache)]:::db
     end
 
     %% Flow Definitions
-    W & M -->|HTTPS / JWT| CF
+    W -->|HTTPS JWT| CF
+    M -->|HTTPS JWT| CF
+    
     CF -->|Clean Traffic| FW
     FW --> API
+    
     API -->|Increment Quota| PAY
     API -->|Trigger Generation| JIT
-    JIT -->|Inject Context| B & D
-    B & D -->|Outputs| R
+    
+    JIT -->|Inject Context| B
+    JIT -->|Inject Context| D
+    
+    B -->|Outputs| R
+    D -->|Outputs| R
+    
     R -->|Final 11-Player Lineup| API
+    
     API -->|Persist Output| T
     API -->|Global Rate Limit| U
     API -.->|Expose Telemetry| METRICS
