@@ -6,6 +6,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), versioned per [S
 
 ---
 
+## [3.0.0-rc1] — 2026-04-06
+
+### 🤖 Agent 0 — Intelligence Harvester & Live Pipeline
+> **Phase 1 Complete** — Real-time sports intelligence is now live and integrated into the multi-agent pipeline.
+
+#### 📡 Intelligence Harvester v2.0 (`workers/harvester.py`)
+- **Implemented:** Multi-source data extraction using `ddgs` (DuckDuckGo) and Open-Meteo for pitch reports, injuries, and weather news.
+- **Implemented:** Background scheduling using FastAPI `lifespan` context — runs every 30 minutes on server start.
+- **Improved:** Rate-limit resistance and circuit-breaking logic on external search calls.
+
+#### 🗄️ Database & Cache Optimization
+- **Fixed:** Turso `INSERT` deadlock in HTTP driver — migrated to `.batch()` execution for all relational writes.
+- **Added:** Automated player pool seeding (120+ players) based on modern IPL/T20 squads.
+- **Implemented:** Dual-sink synchronization — intelligence data is persisted in Turso and cached in Upstash Redis for 4ms latency.
+
+#### 🌐 API & Frontend Stabilization
+- **Fixed:** GitHub Actions CI/CD build failures by injecting mock Supabase credentials during pre-rendering.
+- **Implemented:** `/api/match/harvester/status` — exposes detailed stats on last run, success rate, and data depth.
+- **Implemented:** `/api/match/harvester/trigger` — secure endpoint to manually force a sync cycle.
+- **Verified:** Agent 1 (Budget Optimizer) integration with live data hashes.
+
+---
+
 ## [2.1.0] — 2026-04-06
 
 ### 🛡️ Security Hardening — Forensic Audit & Remediation

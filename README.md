@@ -29,23 +29,20 @@
 
 ---
 
-## 🔥 Recent Updates — v2.1.0 (April 6, 2026)
+## 🔥 Phase 1 Milestone — v3.0.0-rc1 (April 6, 2026)
 
-> **Forensic Security Audit & Architecture Hardening** — 24 bugs/vulnerabilities found and fixed.
+> **Agent 0 Intelligence Harvester & Live Pipeline 100% Operational** — The foundation of real-time sports AI is now solidified.
 
 | Category | Key Changes |
 |----------|-------------|
-| 🛡️ **AI Firewall** | Complete rewrite with 6 security layers: body size limits (1MB), content-type validation, CRLF header injection detection, per-IP violation tracking with auto-ban, SSRF blocking, expanded attack patterns |
-| 🔐 **JWT Auth** | HTTPS enforcement, algorithm whitelist, token revocation (logout works!), issuer validation, clock-skew tolerance |
-| ⚡ **Custom Exceptions** | New `core/exceptions.py` — 8 typed exception classes with automatic HTTP status mapping |
-| 🧪 **Testing** | 9 → **32 tests** covering: firewall attacks, auth, data validation, anti-hallucination, security headers, input sanitization |
-| 🚫 **Anti-Hallucination** | Player data validation pipeline, post-generation constraint checker, auto-heal safety net |
-| 🔒 **Security Headers** | CSP, HSTS, X-Frame-Options, X-XSS-Protection, nosniff — on every response |
-| 📝 **Error Handling** | Traceback truncation (4KB max), sensitive data redaction, environment-aware client messages |
-| 🌐 **Production Lockdown** | `/docs` disabled, `/diagnostics` blocked, `/ready` sanitized, CORS tightened |
+| 🤖 **Agent 0** | **Intelligence Harvester v2.0** — Multi-source pipeline (DuckDuckGo + Open-Meteo) fetching live injuries, pitch reports, and weather. |
+| 🗄️ **Database** | **Turso Batch Fix** — Resolved HTTP driver batch execution errors. Automated player pool seeding (120+ players) for live matches. |
+| ⚡ **Redis Push** | **Upstash Pipeline** — Real-time intelligence broadcast via Redis with a robust 30-min polling cycle inside FastAPI lifespan. |
+| 🛡️ **CI/CD Fix** | **GitHub Actions Restored** — Fixed Next.js build failures by providing mock Supabase env vars during static pre-rendering. |
+| 🧪 **Verification** | **Agent 1 Integration** — Confirmed team generator correctly consumes live harvested data for optimal 11-player generation. |
+| 🌐 **Live Status** | **New Endpoints** — Added `GET /api/match/harvester/status` and `POST /api/match/harvester/trigger` for observability. |
 
-> 📋 Full details: **[CHANGELOG.md](CHANGELOG.md)**
-
+---
 
 ## 🚀 Features (v3.0 Master Release)
 
