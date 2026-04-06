@@ -161,14 +161,16 @@ def test_generate_team_match_id_with_spaces(client):
     assert response.status_code == 422
 
 
-def test_generate_team_valid_match_id_formats(client):
+@patch('services.ai_service.generate_team_with_agents', new_callable=AsyncMock)
+def test_generate_team_valid_match_id_formats(mock_generate, client):
+    mock_generate.return_value = _mock_team_result()
     valid_ids = ["ipl_2026_01", "match-123", "IPL2026CSKvsMI", "t20_world_cup-2026"]
     for match_id in valid_ids:
         response = client.post(
             "/api/team/generate",
             json={"match_id": match_id, "budget": 100, "risk_level": "balanced"},
         )
-        assert response.status_code != 422, f"Valid match_id '{match_id}' was rejected"
+        assert response.status_code != 422, f"Valid match_id '{match_id}' was rejected: {response.text}"
 
 
 def test_generate_team_negative_budget(client):

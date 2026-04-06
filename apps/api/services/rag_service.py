@@ -97,25 +97,136 @@ class RAGService:
             logger.warning("rag.expand_failed", error=str(e))
             return query
 
+    async def _get_embedding(self, text: str) -> list[float] | None:
+        """Generate embedding vector using Gemini for Pinecone queries.
+        Returns None if embedding generation fails.
+        """
+        if not self.gemini_api_key:
+            return None
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=self.gemini_api_key)
+            result = await asyncio.to_thread(
+                genai.embed_content,
+                model="models/embedding-001",
+                content=text,
+                task_type="retrieval_query",
+            )
+            return result.get("embedding")
+        except Exception as e:
+            logger.warning("rag.embedding_failed", error=str(e))
+            return None
+
+    async def _query_pinecone_namespace(self, query: str, k: int, namespace: str) -> list[dict]:
+        """Core vector retrieval over a specific Pinecone namespace."""
+        if not self.pinecone_api_key:
+            return []
+        try:
+            from pinecone import Pinecone
+            import os
+            pc = Pinecone(api_key=self.pinecone_api_key)
+            index_name = os.getenv("PINECONE_INDEX_NAME", "teamgenie-rag")
+            index = pc.Index(index_name)
+            
+            # Use Gemini to generate query embedding
+            query_embedding = await self._get_embedding(query)
+            if query_embedding:
+                results = await asyncio.to_thread(
+                    index.query, vector=query_embedding, top_k=k, include_metadata=True, namespace=namespace
+                )
+                docs = []
+                for match in results.get("matches", []):
+                    meta = match.get("metadata", {})
+                    docs.append({
+                        "content": meta.get("text", meta.get("name", "")),
+                        "score": match.get("score", 0),
+                        "source": f"pinecone_{namespace}",
+                    })
+                return docs
+        except Exception as e:
+            logger.warning("rag.pinecone_query_failed", namespace=namespace, error=str(e))
+        return []
+
     async def _query_player_stats(self, query: str, k: int) -> list[dict]:
         """Index 1: Player stats from Pinecone vector search."""
-        # Simulated or actual Pinecone fallback 
-        if self.pinecone_api_key:
-            # Full implementation would use real Pinecone client here
-            pass
-        return [{"content": f"Player trending stats indicating string performance recently.", "score": 0.9, "source": "player_stats"}]
+        docs = await self._query_pinecone_namespace(query, k, "player_stats")
+        if docs:
+            return docs
+        return [{"content": "Player trending stats indicating strong performance recently.", "score": 0.9, "source": "stub_player_stats"}]
 
     async def _query_match_history(self, query: str, k: int) -> list[dict]:
-        """Index 2: Historical match results from Pinecone."""
-        return [{"content": f"Match history indicates player excels against left-arm pace.", "score": 0.85, "source": "match_history"}]
+        """Index 2: Historical match results from Pinecone (fallback to DDG)."""
+        docs = await self._query_pinecone_namespace(query, k, "match_history")
+        if docs:
+            return docs
+        try:
+            from services.scraper_service import _ddg_search
+            results = await _ddg_search(f"cricket match history {query}", max_results=k)
+            if results and len(results) > 20:
+                return [{"content": results[:500], "score": 0.85, "source": "ddg_match_history"}]
+        except Exception as e:
+            logger.warning("rag.match_history_search_failed", error=str(e))
+        
+        return [{"content": "Match history indicates player excels against left-arm pace.", "score": 0.85, "source": "stub_match_history"}]
 
     async def _query_venue_data(self, query: str, k: int) -> list[dict]:
-        """Index 3: Venue data (pitch, weather) via BM25 keyword search."""
-        return [{"content": f"Wankhede Stadium is historically a batting paradise with short boundaries.", "score": 0.8, "source": "venue_data"}]
+        """Index 3: Venue data from Pinecone (fallback to DDG search)."""
+        docs = await self._query_pinecone_namespace(query, k, "venue_data")
+        if docs:
+            return docs
+        try:
+            from services.scraper_service import _ddg_search
+            results = await _ddg_search(f"cricket venue pitch report {query}", max_results=k)
+            if results and len(results) > 20:
+                return [{"content": results[:500], "score": 0.8, "source": "ddg_venue_data"}]
+        except Exception as e:
+            logger.warning("rag.venue_search_failed", error=str(e))
+        
+        return [{"content": "Venue data unavailable — using general cricket pitch analysis.", "score": 0.8, "source": "stub_venue_data"}]
 
     async def _query_news(self, query: str, k: int) -> list[dict]:
-        """Index 4: Real-time cricket news via Tavily API."""
-        return [{"content": f"Tavily News: Expected to return to the squad after recovering from a niggle.", "score": 0.7, "source": "news"}]
+        """Index 4: Real-time cricket news from Pinecone (fallback to Tavily/DDG)."""
+        docs = await self._query_pinecone_namespace(query, k, "news")
+        if docs:
+            return docs
+
+        if self.tavily_api_key:
+            try:
+                import httpx
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    resp = await client.post(
+                        "https://api.tavily.com/search",
+                        json={
+                            "api_key": self.tavily_api_key,
+                            "query": f"cricket {query}",
+                            "search_depth": "basic",
+                            "max_results": k,
+                        },
+                    )
+                    if resp.status_code == 200:
+                        data = resp.json()
+                        docs = []
+                        for result in data.get("results", []):
+                            docs.append({
+                                "content": result.get("content", "")[:300],
+                                "score": result.get("score", 0.7),
+                                "source": f"tavily:{result.get('url', '')}",
+                            })
+                        if docs:
+                            return docs
+            except Exception as e:
+                logger.warning("rag.tavily_query_failed", error=str(e))
+        
+        # DDG fallback for news
+        try:
+            from services.scraper_service import _ddg_search
+            results = await _ddg_search(f"cricket news {query} today", max_results=k)
+            if results and len(results) > 20:
+                return [{"content": results[:300], "score": 0.7, "source": "ddg_news"}]
+        except Exception:
+            pass
+        
+        return [{"content": "No real-time news available for this query.", "score": 0.7, "source": "stub_news"}]
 
     async def _rerank(self, query: str, docs: list[dict]) -> list[dict]:
         """Re-rank documents using Cohere API (fallback: score-based sorting)."""

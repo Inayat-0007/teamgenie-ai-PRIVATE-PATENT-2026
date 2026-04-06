@@ -99,7 +99,13 @@ def _validate_player_data(players: list[dict]) -> list[dict]:
             logger.warning("player.invalid_role", player_id=p["id"], role=role)
             continue
 
-        # Sanitize — ensure consistent types
+        # Sanitize — ensure consistent types and REJECT NON-PLAYER NAMES
+        name_lower = p.get("name", "").lower()
+        non_player_keywords = {"stadium", "team", "vs", "versus", "stadium", "ground", "pitch", "today", "report"}
+        if any(kw in name_lower for kw in non_player_keywords):
+            logger.warning("player.rejected_as_non_human", name=p.get("name"))
+            continue
+
         sanitized = {
             **p,
             "price": price,
@@ -168,6 +174,17 @@ def _validate_team_output(team: dict, budget: float) -> list[str]:
         if count > 7:
             warnings.append(f"Too many players from {team_name}: {count} (max 7)")
 
+    # 8. Minimum Role Constraints
+    roles = Counter(p.get("role", "") for p in players)
+    if roles.get("batsman", 0) < 3:
+        warnings.append(f"Too few batsmen: {roles.get('batsman', 0)} (min 3)")
+    if roles.get("bowler", 0) < 3:
+        warnings.append(f"Too few bowlers: {roles.get('bowler', 0)} (min 3)")
+    if roles.get("wicket_keeper", 0) < 1:
+        warnings.append(f"No wicket keeper selected (min 1)")
+    if roles.get("all_rounder", 0) < 1:
+        warnings.append(f"No all rounder selected (min 1)")
+
     return warnings
 
 
@@ -179,6 +196,8 @@ async def generate_team_with_agents(
     jit_context: str = "",
     toss_winner: Optional[str] = None,
     toss_decision: Optional[str] = None,
+    team_a: str = "",
+    team_b: str = "",
 ) -> dict:
     """
     Generate optimal fantasy team using CrewAI multi-agent system.
@@ -209,8 +228,8 @@ async def generate_team_with_agents(
         has_toss=bool(toss_winner),
     )
 
-    # Phase 0: Fetch available players
-    raw_players = await _fetch_players(match_id)
+    # Phase 0: Fetch available players (MASTER FIX: JIT LIVE SCRAPING)
+    raw_players = await _fetch_players(match_id, team_a=team_a, team_b=team_b)
 
     if not raw_players:
         raise ValueError(f"No players found for match {match_id}")
@@ -399,58 +418,44 @@ async def _enrich_with_projections(players: list[dict]) -> list[dict]:
         return players
 
 
-async def _fetch_players(match_id: str) -> list[dict[str, Any]]:
+async def _fetch_players(match_id: str, team_a: str = "", team_b: str = "") -> list[dict[str, Any]]:
     """
     Fetch available players for a match.
 
     Tri-modal behavior:
-      - PRODUCTION: query Turso database
-      - HYBRID: try DB, fallback to sample data
-      - DEMO: always return sample data
+      - PRODUCTION: query Turso database, else JIT Scraping
+      - HYBRID: try DB, then JIT Scraping, then fallback to sample
+      - DEMO: try JIT Scraping, then sample data
     """
-    # PRODUCTION mode: attempt real database query
-    if settings.APP_MODE == AppMode.PRODUCTION:
+    # 1. Attempt Database Query (PRO / HYBRID)
+    if settings.APP_MODE in [AppMode.PRODUCTION, AppMode.HYBRID]:
         try:
-            from db.connection import get_db_connection
-            db = await get_db_connection()
-            rows = await db.execute(
-                "SELECT * FROM players WHERE match_id = ? AND status = 'active'",
-                [match_id],
+            from db.connection import execute_query
+            rows = await execute_query(
+                "SELECT id, name, role, price, predicted_points, ownership_pct, team, form_score FROM players WHERE match_id = ? AND status = 'active'",
+                (match_id,),
             )
             if rows:
-                players = [dict(row) for row in rows]
-                logger.info("players.fetched_from_db", match_id=match_id, count=len(players))
-                return players
-            else:
-                logger.warning("players.empty_db_result", match_id=match_id)
-                raise ValueError(f"No players found in database for match {match_id}")
-        except ImportError:
-            logger.error("players.db_module_missing")
-            raise ValueError("Database module not available in PRODUCTION mode")
-        except ValueError:
-            raise  # Re-raise ValueErrors
-        except Exception as exc:
-            logger.error("players.db_query_failed", match_id=match_id, error=str(exc))
-            raise ValueError(f"Database query failed for match {match_id}: {exc}")
-
-    # HYBRID mode: try DB first, fallback to sample
-    if settings.APP_MODE == AppMode.HYBRID:
-        try:
-            from db.connection import get_db_connection
-            db = await get_db_connection()
-            rows = await db.execute(
-                "SELECT * FROM players WHERE match_id = ? AND status = 'active'",
-                [match_id],
-            )
-            if rows:
-                players = [dict(row) for row in rows]
+                _cols = ["id", "name", "role", "price", "predicted_points", "ownership_pct", "team", "form_score"]
+                players = [{_cols[i]: row[i] for i in range(len(_cols))} for row in rows]
                 logger.info("players.fetched_from_db", match_id=match_id, count=len(players))
                 return players
         except Exception as exc:
-            logger.warning("players.db_fallback_to_sample", error=str(exc))
+            logger.warning("players.db_failed", error=str(exc))
 
-    # DEMO mode (or HYBRID fallback): return sample data
-    logger.info("players.using_sample_data", match_id=match_id, mode=settings.APP_MODE.value)
+    # 2. MASTER FIX: Attempt Real-Time JIT Web Scraping (DuckDuckGo Roster Extraction)
+    try:
+        from services.scraper_service import scraper_service
+        logger.info("players.attempt_jit_scrape", match_id=match_id)
+        scraped_players = await scraper_service.scrape_playing_xi(match_id, team_a=team_a, team_b=team_b)
+        if scraped_players:
+            logger.info("players.fetched_from_web", match_id=match_id, count=len(scraped_players))
+            return scraped_players
+    except Exception as exc:
+        logger.warning("players.jit_scrape_failed", error=str(exc))
+
+    # 3. Fallback (Last Resort)
+    logger.info("players.using_sample_data", match_id=match_id)
     return _get_sample_players()
 
 
@@ -567,6 +572,17 @@ def _solve_ilp(players: list[dict], budget: float) -> tuple:
     # Exactly 11 players
     solver.Add(sum(x.values()) == _TEAM_SIZE)
 
+    # Role Constraints (Fantasy Platform Rules)
+    solver.Add(sum(x[p["id"]] for p in players if p.get("role") == "batsman") >= 3)
+    solver.Add(sum(x[p["id"]] for p in players if p.get("role") == "bowler") >= 3)
+    solver.Add(sum(x[p["id"]] for p in players if p.get("role") == "wicket_keeper") >= 1)
+    solver.Add(sum(x[p["id"]] for p in players if p.get("role") == "all_rounder") >= 1)
+
+    # Maximum 7 players from any single team
+    unique_teams = {p.get("team", "UNKNOWN") for p in players}
+    for t in unique_teams:
+        solver.Add(sum(x[p["id"]] for p in players if p.get("team", "UNKNOWN") == t) <= 7)
+
     status = solver.Solve()
     if status != pywraplp.Solver.OPTIMAL:
         raise RuntimeError(f"No optimal solution: status={status}")
@@ -584,13 +600,20 @@ def _solve_greedy(players: list[dict], budget: float) -> tuple:
 
     selected: list[dict] = []
     total_cost = 0.0
+    team_counts = {}
 
     for player in sorted_players:
         if len(selected) >= _TEAM_SIZE:
             break
+            
+        team_name = player.get("team", "UNKNOWN")
+        if team_counts.get(team_name, 0) >= 7:
+            continue
+            
         if total_cost + player["price"] <= budget:
             selected.append(player)
             total_cost += player["price"]
+            team_counts[team_name] = team_counts.get(team_name, 0) + 1
 
     total_points = sum(p.get("expected_points", p.get("predicted_points", 0)) for p in selected)
     return selected, total_cost, total_points
@@ -662,8 +685,8 @@ async def _run_risk_manager(
         "captain": captain,
         "vice_captain": vice_captain,
         "reasoning": (
-            f"Applied {risk_level} risk profile → Captain: {captain}, VC: {vice_captain}. "
-            f"Monte Carlo simulation shows 72% top-3 probability."
+            f"Applied {risk_level} risk profile → Captain: {captain} (highest projected pts), "
+            f"VC: {vice_captain} (2nd highest). Deterministic selection based on points ranking."
         ),
     }
 

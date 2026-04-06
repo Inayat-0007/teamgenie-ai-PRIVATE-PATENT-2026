@@ -1,0 +1,36 @@
+services:
+  - type: web
+    name: teamgenie-ai-backend
+    env: docker
+    rootDir: apps/api
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_ENV
+        value: production
+      - key: APP_MODE
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: UPSTASH_REDIS_URL
+        sync: false
+      - key: PINECONE_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_ENVIRONMENT
+        value: production
+      - key: ENABLE_AI_FIREWALL
+        value: "true"
+      - key: CORS_ORIGINS
+        value: "https://teamgenie.ai,https://www.teamgenie.ai"

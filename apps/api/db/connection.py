@@ -37,9 +37,23 @@ except ImportError:
     _RETRY_KWARGS = {}
 
 
+# Module-level singleton to avoid per-query connection churn
+_turso_client = None
+_turso_client_failed = False
+
+
 @retry(**_RETRY_KWARGS)
 async def get_turso_client():
-    """Get Turso (LibSQL) database client with retry."""
+    """Get Turso (LibSQL) database client — singleton, reused across queries.
+    
+    Previously this created a new client per query (153+ TLS handshakes per
+    harvest cycle). Now caches a single client for the process lifetime.
+    """
+    global _turso_client, _turso_client_failed
+    
+    if _turso_client is not None and not _turso_client_failed:
+        return _turso_client
+    
     from libsql_client import create_client
 
     url = os.getenv("TURSO_DATABASE_URL")
@@ -48,9 +62,10 @@ async def get_turso_client():
     if not url or not token:
         raise EnvironmentError("TURSO_DATABASE_URL and TURSO_AUTH_TOKEN must be set")
 
-    client = create_client(url=url, auth_token=token)
+    _turso_client = create_client(url=url, auth_token=token)
+    _turso_client_failed = False
     logger.debug("turso.connected", url=url[:30] + "...")
-    return client
+    return _turso_client
 
 
 @retry(**_RETRY_KWARGS)
@@ -94,7 +109,11 @@ async def execute_query(query: str, params: tuple = ()) -> list:
     
     Uses batch() instead of execute() to work around a KeyError: 'result' bug
     in libsql_client 0.3.1's HTTP driver for INSERT/REPLACE statements.
+    
+    NOTE: Does NOT close the client — singleton is reused across queries.
+    On connection failure, marks the client for recreation on the next call.
     """
+    global _turso_client_failed
     from libsql_client import Statement
     client = await get_turso_client()
     try:
@@ -105,5 +124,6 @@ async def execute_query(query: str, params: tuple = ()) -> list:
             if hasattr(rs, 'rows'):
                 return rs.rows
         return []
-    finally:
-        await client.close()
+    except Exception as exc:
+        _turso_client_failed = True  # Force reconnect on next call
+        raise

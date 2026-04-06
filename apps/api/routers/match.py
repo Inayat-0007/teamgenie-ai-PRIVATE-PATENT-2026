@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 try:
@@ -183,13 +184,14 @@ async def get_upcoming_matches(
     except Exception as e:
         logger.warning("match.query_failed", reason="Matches table missing or query failed", error=str(e))
 
-    # Production fallback — hardcoded seed data
+    # Production fallback — dynamically dated seed data
+    today = datetime.now()
     return {
         "matches": [
-            {"id": "ipl_2026_01", "title": "Chennai Super Kings vs Mumbai Indians", "league": "IPL 2026", "date": "Tonight, 7:30 PM IST", "status": "upcoming", "prize": "₹10 Crores"},
-            {"id": "ipl_2026_02", "title": "Royal Challengers Bangalore vs KKR", "league": "IPL 2026", "date": "Tomorrow, 7:30 PM IST", "status": "upcoming", "prize": "₹5 Crores"},
-            {"id": "wc_2027_10", "title": "India vs Australia", "league": "World Cup", "date": "Friday, 2:00 PM IST", "status": "upcoming", "prize": "₹20 Crores"},
-            {"id": "eng_aus_01", "title": "England vs Australia", "league": "The Ashes", "date": "Sat, 10:00 AM IST", "status": "upcoming", "prize": "₹2 Crores"}
+            {"id": "ipl_2026_01", "title": "Chennai Super Kings vs Mumbai Indians", "league": "IPL 2026", "date": today.strftime("%Y-%m-%dT19:30:00+05:30"), "status": "upcoming", "prize": "₹10 Crores"},
+            {"id": "ipl_2026_02", "title": "Royal Challengers Bangalore vs KKR", "league": "IPL 2026", "date": (today + timedelta(days=1)).strftime("%Y-%m-%dT19:30:00+05:30"), "status": "upcoming", "prize": "₹5 Crores"},
+            {"id": "wc_2027_10", "title": "India vs Australia", "league": "World Cup", "date": (today + timedelta(days=4)).strftime("%Y-%m-%dT14:00:00+05:30"), "status": "upcoming", "prize": "₹20 Crores"},
+            {"id": "eng_aus_01", "title": "England vs Australia", "league": "The Ashes", "date": (today + timedelta(days=5)).strftime("%Y-%m-%dT10:00:00+05:30"), "status": "upcoming", "prize": "₹2 Crores"}
         ],
         "total": 4,
         "source": "fallback",
@@ -274,18 +276,12 @@ async def get_live_score(match_id: str):
     except Exception:
         pass
 
-    # Production fallback mock
-    mock_score = {
-        "batting_team": "CSK",
-        "score": "184/4",
-        "overs": "19.2",
-        "run_rate": "9.51",
-        "recent_activity": ["W", "4", "1", "6"],
-        "striker": {"name": "MS Dhoni", "runs": 24, "balls": 10},
-        "non_striker": {"name": "Ravindra Jadeja", "runs": 12, "balls": 8},
-        "bowler": {"name": "Jasprit Bumrah", "overs": "3.2", "runs": 22, "wickets": 2}
+    # No live data available — return honest response instead of fake scores
+    return {
+        "match": {"id": match_id, "status": "no_live_data"},
+        "message": "No live data available. The match may not have started yet, or live tracking is not available for this match.",
+        "source": "unavailable",
     }
-    return {"match": {"id": match_id, "status": "live"}, "live_score": mock_score, "source": "mock"}
 
 
 @router.get("/{match_id}/intelligence")

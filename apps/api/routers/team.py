@@ -181,6 +181,8 @@ async def generate_team(
                 jit_context=jit_context,
                 toss_winner=request.toss_winner,
                 toss_decision=request.toss_decision,
+                team_a=request.team_a or "",
+                team_b=request.team_b or "",
             )
 
         timing_data = timer.export()

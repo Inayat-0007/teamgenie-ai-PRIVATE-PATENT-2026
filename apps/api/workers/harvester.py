@@ -115,27 +115,36 @@ async def _fetch_weather(venue_key: str) -> Dict[str, Any]:
 # IPL 2026 Match Schedule (seed data — augmented by scraper in full prod)
 # ---------------------------------------------------------------------------
 
-def _get_ipl_2026_schedule() -> List[Dict]:
-    """Return IPL 2026 match schedule for seeding."""
+async def _get_ipl_2026_schedule() -> List[Dict]:
+    """Return IPL match schedule. Uses DDG for current real-world context,
+    but anchors dates to datetime.now() to ensure pipeline stability.
+    """
+    try:
+        # Fetch real-world schedule context (for logging/future LLM parsing)
+        ddg_context = await _ddg_search("IPL schedule this week", max_results=2)
+        logger.debug("harvester.schedule_search", found=len(ddg_context))
+    except Exception as e:
+        logger.debug("harvester.schedule_search_failed", error=str(e))
+
+    today = datetime.now()
+    from datetime import timedelta
+    
     return [
-        {"id": "ipl_2026_01", "title": "Chennai Super Kings vs Mumbai Indians", "league": "IPL 2026",
-         "team_a": "CSK", "team_b": "MI", "venue": "chepauk",
-         "date": "2026-04-07T19:30:00+05:30", "status": "upcoming", "prize": "₹10 Crores"},
-        {"id": "ipl_2026_02", "title": "Royal Challengers Bangalore vs KKR", "league": "IPL 2026",
-         "team_a": "RCB", "team_b": "KKR", "venue": "chinnaswamy",
-         "date": "2026-04-08T19:30:00+05:30", "status": "upcoming", "prize": "₹5 Crores"},
-        {"id": "ipl_2026_03", "title": "Delhi Capitals vs Rajasthan Royals", "league": "IPL 2026",
-         "team_a": "DC", "team_b": "RR", "venue": "feroz_shah_kotla",
-         "date": "2026-04-09T19:30:00+05:30", "status": "upcoming", "prize": "₹5 Crores"},
-        {"id": "ipl_2026_04", "title": "Gujarat Titans vs Punjab Kings", "league": "IPL 2026",
-         "team_a": "GT", "team_b": "PBKS", "venue": "narendra_modi",
-         "date": "2026-04-10T19:30:00+05:30", "status": "upcoming", "prize": "₹5 Crores"},
-        {"id": "ipl_2026_05", "title": "Lucknow Super Giants vs Sunrisers Hyderabad", "league": "IPL 2026",
-         "team_a": "LSG", "team_b": "SRH", "venue": "lucknow",
-         "date": "2026-04-11T15:30:00+05:30", "status": "upcoming", "prize": "₹5 Crores"},
-        {"id": "wc_2027_10", "title": "India vs Australia", "league": "World Cup",
-         "team_a": "IND", "team_b": "AUS", "venue": "wankhede",
-         "date": "2026-04-12T14:00:00+05:30", "status": "upcoming", "prize": "₹20 Crores"},
+        {"id": "ipl_2026_13_rr_vs_mi", "title": "Rajasthan Royals vs Mumbai Indians", "league": "IPL 2026",
+         "team_a": "RR", "team_b": "MI", "venue": "sawai_mansingh",
+         "date": today.strftime("%Y-%m-%dT19:30:00+05:30"), "status": "upcoming", "prize": "₹15 Crores"},
+        {"id": "ipl_2026_14_dc_vs_gt", "title": "Delhi Capitals vs Gujarat Titans", "league": "IPL 2026",
+         "team_a": "DC", "team_b": "GT", "venue": "feroz_shah_kotla",
+         "date": (today + timedelta(days=1)).strftime("%Y-%m-%dT19:30:00+05:30"), "status": "upcoming", "prize": "₹10 Crores"},
+        {"id": "ipl_2026_15_kkr_vs_lsg", "title": "Kolkata Knight Riders vs Lucknow Super Giants", "league": "IPL 2026",
+         "team_a": "KKR", "team_b": "LSG", "venue": "eden_gardens",
+         "date": (today + timedelta(days=2)).strftime("%Y-%m-%dT19:30:00+05:30"), "status": "upcoming", "prize": "₹10 Crores"},
+        {"id": "ipl_2026_16_rr_vs_rcb", "title": "Rajasthan Royals vs Royal Challengers Bangalore", "league": "IPL 2026",
+         "team_a": "RR", "team_b": "RCB", "venue": "sawai_mansingh",
+         "date": (today + timedelta(days=3)).strftime("%Y-%m-%dT19:30:00+05:30"), "status": "upcoming", "prize": "₹12 Crores"},
+         {"id": "ipl_2026_17_pbks_vs_csk", "title": "Punjab Kings vs Chennai Super Kings", "league": "IPL 2026",
+         "team_a": "PBKS", "team_b": "CSK", "venue": "mohali",
+         "date": (today + timedelta(days=4)).strftime("%Y-%m-%dT19:30:00+05:30"), "status": "upcoming", "prize": "₹15 Crores"},
     ]
 
 
@@ -144,29 +153,24 @@ def _get_ipl_2026_schedule() -> List[Dict]:
 # ---------------------------------------------------------------------------
 
 def _get_player_pool() -> List[Dict]:
-    """Return a realistic player pool for match seeding."""
-    return [
-        {"id": "virat_kohli", "name": "Virat Kohli", "role": "batsman", "price": 10.5, "predicted_points": 85.3, "ownership_pct": 67.3, "team": "RCB", "form_score": 88},
-        {"id": "rohit_sharma", "name": "Rohit Sharma", "role": "batsman", "price": 10.0, "predicted_points": 72.1, "ownership_pct": 71.5, "team": "MI", "form_score": 72},
-        {"id": "jasprit_bumrah", "name": "Jasprit Bumrah", "role": "bowler", "price": 9.5, "predicted_points": 68.4, "ownership_pct": 55.2, "team": "MI", "form_score": 91},
-        {"id": "ravindra_jadeja", "name": "Ravindra Jadeja", "role": "all_rounder", "price": 9.0, "predicted_points": 65.0, "ownership_pct": 42.1, "team": "CSK", "form_score": 78},
-        {"id": "rishabh_pant", "name": "Rishabh Pant", "role": "wicket_keeper", "price": 9.0, "predicted_points": 60.5, "ownership_pct": 38.7, "team": "DC", "form_score": 75},
-        {"id": "hardik_pandya", "name": "Hardik Pandya", "role": "all_rounder", "price": 9.0, "predicted_points": 62.0, "ownership_pct": 45.3, "team": "MI", "form_score": 69},
-        {"id": "suryakumar_yadav", "name": "Suryakumar Yadav", "role": "batsman", "price": 9.0, "predicted_points": 70.2, "ownership_pct": 50.1, "team": "MI", "form_score": 82},
-        {"id": "kuldeep_yadav", "name": "Kuldeep Yadav", "role": "bowler", "price": 8.5, "predicted_points": 55.3, "ownership_pct": 28.5, "team": "DC", "form_score": 70},
-        {"id": "mohammed_siraj", "name": "Mohammed Siraj", "role": "bowler", "price": 8.0, "predicted_points": 50.1, "ownership_pct": 22.3, "team": "RCB", "form_score": 65},
-        {"id": "axar_patel", "name": "Axar Patel", "role": "all_rounder", "price": 8.0, "predicted_points": 48.5, "ownership_pct": 18.2, "team": "DC", "form_score": 60},
-        {"id": "shubman_gill", "name": "Shubman Gill", "role": "batsman", "price": 9.5, "predicted_points": 58.0, "ownership_pct": 35.6, "team": "GT", "form_score": 76},
-        {"id": "ms_dhoni", "name": "MS Dhoni", "role": "wicket_keeper", "price": 8.5, "predicted_points": 45.0, "ownership_pct": 52.0, "team": "CSK", "form_score": 55},
-        {"id": "ruturaj_gaikwad", "name": "Ruturaj Gaikwad", "role": "batsman", "price": 9.0, "predicted_points": 63.5, "ownership_pct": 30.2, "team": "CSK", "form_score": 80},
-        {"id": "pat_cummins", "name": "Pat Cummins", "role": "bowler", "price": 9.0, "predicted_points": 58.0, "ownership_pct": 32.0, "team": "SRH", "form_score": 85},
-        {"id": "rashid_khan", "name": "Rashid Khan", "role": "bowler", "price": 9.5, "predicted_points": 62.0, "ownership_pct": 40.5, "team": "GT", "form_score": 88},
-        {"id": "matheesha_pathirana", "name": "Matheesha Pathirana", "role": "bowler", "price": 7.5, "predicted_points": 52.0, "ownership_pct": 12.0, "team": "CSK", "form_score": 78},
-        {"id": "tristan_stubbs", "name": "Tristan Stubbs", "role": "batsman", "price": 7.0, "predicted_points": 48.0, "ownership_pct": 8.5, "team": "DC", "form_score": 73},
-        {"id": "devon_conway", "name": "Devon Conway", "role": "batsman", "price": 8.0, "predicted_points": 55.0, "ownership_pct": 15.0, "team": "CSK", "form_score": 71},
-        {"id": "sam_curran", "name": "Sam Curran", "role": "all_rounder", "price": 8.5, "predicted_points": 54.0, "ownership_pct": 25.0, "team": "PBKS", "form_score": 68},
-        {"id": "rinku_singh", "name": "Rinku Singh", "role": "batsman", "price": 7.5, "predicted_points": 50.0, "ownership_pct": 20.0, "team": "KKR", "form_score": 74},
-    ]
+    """Return a realistic player pool for match seeding using all major teams."""
+    from pool import TEAMS  # TEAMS dictionary created dynamically 
+    
+    players = []
+    for team, roster in TEAMS.items():
+        for p in roster:
+            name, role, price = p
+            players.append({
+                "id": name.lower().replace(" ", "_"),
+                "name": name,
+                "role": role,
+                "price": price,
+                "predicted_points": price * 7.5, # Realistic baseline
+                "ownership_pct": price * 5.0,
+                "team": team,
+                "form_score": price * 8.0,
+            })
+    return players
 
 
 # ---------------------------------------------------------------------------
@@ -213,7 +217,11 @@ async def _push_to_redis(match_data: List[Dict], intel_data: Dict[str, Dict]) ->
         return 0
 
     keys_written = 0
-    is_async = hasattr(redis, 'setex')  # redis.asyncio vs upstash_redis
+    try:
+        import redis.asyncio as aioredis
+        is_async = isinstance(redis, aioredis.Redis)
+    except ImportError:
+        is_async = False
 
     try:
         # 1. Push each match's live data
@@ -265,7 +273,7 @@ async def _push_to_redis(match_data: List[Dict], intel_data: Dict[str, Dict]) ->
     except Exception as exc:
         logger.warning("harvester.redis_push_failed", error=str(exc))
     finally:
-        if is_async and hasattr(redis, 'close'):
+        if is_async:
             try:
                 await redis.close()
             except Exception:
@@ -374,7 +382,7 @@ async def run_harvest() -> Dict[str, Any]:
         return {"error": str(exc)}
 
     # Step 2: Seed match schedule
-    schedule = _get_ipl_2026_schedule()
+    schedule = await _get_ipl_2026_schedule()
     match_count = await _seed_matches_to_turso(schedule)
     logger.info("harvester.matches_seeded", count=match_count)
 
@@ -382,7 +390,10 @@ async def run_harvest() -> Dict[str, Any]:
     player_pool = _get_player_pool()
     player_count = 0
     for match in schedule:
+        allowed_teams = {match.get("team_a", ""), match.get("team_b", "")}
         for player in player_pool:
+            if player["team"] not in allowed_teams:
+                continue
             try:
                 pid = f"{player['id']}_{match['id']}"
                 await execute_query(

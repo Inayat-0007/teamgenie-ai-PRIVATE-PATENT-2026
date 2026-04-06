@@ -46,7 +46,7 @@ except ImportError:
     sentry_sdk = None  # type: ignore[assignment]
     logger.warning("sentry.unavailable", reason="sentry_sdk package not installed — error tracking disabled")
 
-from routers import auth, match, player, team, user
+from routers import auth, match, player, team, user, payment
 
 # ---------------------------------------------------------------------------
 # Metrics — prometheus_client middleware + /metrics endpoint (issue #3/#9 fix)
@@ -205,7 +205,7 @@ if _metrics_middleware_available and metrics_middleware is not None:
 # This MUST be the outermost middleware so it can attach headers to ALL responses,
 # including early error returns from the firewall, rate limiter, or error handler.
 _allowed_origins = os.getenv(
-    "ALLOWED_ORIGINS", "http://localhost:3000"
+    "CORS_ORIGINS", os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
 ).split(",")
 
 app.add_middleware(
@@ -228,6 +228,7 @@ app.include_router(team.router, prefix="/api/team", tags=["Team Generation"])
 app.include_router(player.router, prefix="/api/player", tags=["Player Insights"])
 app.include_router(match.router, prefix="/api/match", tags=["Match Data"])
 app.include_router(user.router, prefix="/api/user", tags=["User Management"])
+app.include_router(payment.router, prefix="/api/payment", tags=["Payments"])
 
 # /metrics — prefer the prometheus_client (generate_latest) version; fall back to in-memory
 if _metrics_middleware_available and metrics_endpoint is not None:

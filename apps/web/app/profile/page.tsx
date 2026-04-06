@@ -1,9 +1,35 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { User, Mail, Shield, Bell, Settings, LogOut, CreditCard, Zap, Edit3, KeyRound } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
 export default function ProfilePage() {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  if (loading) {
+     return <div className="min-h-screen bg-[#050505] flex items-center justify-center text-white">Loading profile...</div>;
+  }
+
+  const email = user?.email || "Unknown Email";
+  const fullName = user?.user_metadata?.full_name || email.split("@")[0] || "User";
+  const tier = user?.user_metadata?.tier || "PRO"; // Fake tier logic for now if unassigned
+
   return (
     <div className="min-h-screen bg-[#050505] text-white py-24 selection:bg-indigo-500/30">
       {/* Background Ambience */}
@@ -51,13 +77,13 @@ export default function ProfilePage() {
                   <Edit3 className="w-4 h-4 text-white" />
                 </button>
               </div>
-              <h2 className="text-xl font-bold">Mohammed Inayat</h2>
-              <p className="text-gray-400 text-sm">mohammed@inayat.com</p>
+              <h2 className="text-xl font-bold">{fullName}</h2>
+              <p className="text-gray-400 text-sm">{email}</p>
               
               <div className="mt-6 pt-6 border-t border-white/10 flex justify-between items-center px-2">
                 <div className="text-left">
                   <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Tier</p>
-                  <p className="text-emerald-400 font-bold flex items-center"><Zap className="w-3 h-3 mr-1" /> PRO</p>
+                  <p className="text-emerald-400 font-bold flex items-center"><Zap className="w-3 h-3 mr-1" /> {tier}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-gray-500 uppercase tracking-widest font-semibold">Quotas</p>

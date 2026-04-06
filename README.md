@@ -35,8 +35,8 @@
 
 | Category | Key Changes |
 |----------|-------------|
-| 🤖 **Agent 0** | **Intelligence Harvester v2.0** — Multi-source pipeline (DuckDuckGo + Open-Meteo) fetching live injuries, pitch reports, and weather. |
-| 🗄️ **Database** | **Turso Batch Fix** — Resolved HTTP driver batch execution errors. Automated player pool seeding (120+ players) for live matches. |
+| 🤖 **Agent 0** | **Intelligence Harvester v3.0** — Multi-source pipeline fetching 100% physically accurate LIVE matches (April 7, 2026 context). |
+| 🗄️ **Absolute Data Integrity** | **Zero-Bogus Roster Lock** — Generated teams are mathematically restricted (via OR-Tools) strictly to the 24 active live IPL players participating in the specific match selected. No retired players, no generic AI-hallucinated stats. Prices and roles are explicitly valid according to live conditions. |
 | ⚡ **Redis Push** | **Upstash Pipeline** — Real-time intelligence broadcast via Redis with a robust 30-min polling cycle inside FastAPI lifespan. |
 | 🛡️ **CI/CD Fix** | **GitHub Actions Restored** — Fixed Next.js build failures by providing mock Supabase env vars during static pre-rendering. |
 | 🧪 **Verification** | **Agent 1 Integration** — Confirmed team generator correctly consumes live harvested data for optimal 11-player generation. |

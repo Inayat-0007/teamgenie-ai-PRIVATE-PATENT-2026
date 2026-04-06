@@ -28,6 +28,10 @@ export default function EliteChatTerminal() {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -59,9 +63,11 @@ export default function EliteChatTerminal() {
       // We would normally fire this text completely to our Backend Agent.
       // For the demo, we ping the standard generation API to prove it works.
       const result = await aiKit.generateTeam({
-        match_id: "csk_mi_" + Date.now().toString().slice(-4), // Just a mocked match ID
+        match_id: "IPL_Today_Match_Live",
         budget: 100,
-        risk_level: "aggressive"
+        risk_level: "aggressive",
+        team_a: "IPL",
+        team_b: "Today's Match"
       });
 
       setMessages(prev => [...prev, {
@@ -111,7 +117,7 @@ export default function EliteChatTerminal() {
             <div className={`inline-block max-w-[85%] ${msg.role === 'system' ? 'w-full' : ''}`}>
               {msg.role === 'system' && (
                 <div className="text-emerald-500 text-xs mb-4 pb-4 border-b border-dashed border-slate-800 opacity-70">
-                  [{new Date().toISOString()}] {msg.content}
+                  [{mounted ? new Date().toISOString() : "CALCULATING..."}] {msg.content}
                 </div>
               )}
               

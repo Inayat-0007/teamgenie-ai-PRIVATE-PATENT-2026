@@ -47,6 +47,7 @@ PUBLIC_ROUTES: frozenset[str] = frozenset({
     "/api/auth/register",
     "/api/auth/forgot-password",
     "/api/auth/refresh",
+    "/api/payment/webhook",
 })
 
 # Prefix-match public routes (for paths with dynamic segments)
@@ -134,14 +135,25 @@ async def verify_jwt(request: Request, call_next):
             raise HTTPException(status_code=500, detail="JWT secret not configured")
 
         algorithm = os.getenv("JWT_ALGORITHM", "HS256")
+        
+        # MASTER LEVEL: Peek at the header to see what algorithm Supabase is actually using
+        try:
+            unverified_header = jwt.get_unverified_header(token)
+            token_algo = unverified_header.get("alg")
+            if token_algo and token_algo != algorithm:
+                logger.info("auth.algorithm_detected", expected=algorithm, got=token_algo)
+                algorithm = token_algo
+        except Exception:
+            pass
 
         # Validate algorithms — only allow known safe algorithms
-        allowed_algorithms = {"HS256", "HS384", "HS512", "RS256", "RS384", "RS512"}
+        allowed_algorithms = {"HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "ES256"}
         if algorithm not in allowed_algorithms:
             logger.error("auth.unsafe_algorithm", algorithm=algorithm)
-            raise HTTPException(status_code=500, detail="Unsafe JWT algorithm configured")
+            raise HTTPException(status_code=500, detail=f"Unsafe JWT algorithm: {algorithm}")
 
         # Decode with options for strict validation
+        # NOTE: For ES256/RS256, 'secret' must be the Public Key (PEM or JWK)
         payload = jwt.decode(
             token,
             secret,
@@ -153,15 +165,9 @@ async def verify_jwt(request: Request, call_next):
             },
         )
 
-        # Belt-and-suspenders expiration check with clock skew tolerance
-        exp = payload.get("exp", 0)
-        now = time.time()
-        if exp < (now - _CLOCK_SKEW_TOLERANCE):
-            logger.info("auth.token_expired", sub=payload.get("sub"), exp=exp)
-            raise HTTPException(status_code=401, detail="Token expired")
-
         # Check issued-at isn't in the future (clock manipulation)
         iat = payload.get("iat", 0)
+        now = time.time()
         if iat > (now + _CLOCK_SKEW_TOLERANCE):
             logger.warning("auth.token_from_future", sub=payload.get("sub"), iat=iat)
             raise HTTPException(status_code=401, detail="Invalid token")
@@ -189,7 +195,17 @@ async def verify_jwt(request: Request, call_next):
     except HTTPException:
         raise
     except JWTError as exc:
-        logger.warning("auth.invalid_token", error=str(exc)[:200])
-        raise HTTPException(status_code=401, detail="Invalid token")
+        error_msg = str(exc)
+        # MASTER LEVEL LOGGING: Identify Mismatch
+        logger.warning(
+            "auth.invalid_token", 
+            error=error_msg,
+            token_sample=token[:10] + "...",
+            reason="Likely SUPABASE_JWT_SECRET mismatch in .env vs Supabase Dashboard"
+        )
+        raise HTTPException(
+            status_code=401, 
+            detail=f"Auth Error: {error_msg}. ACTION: Ensure SUPABASE_JWT_SECRET in .env matches the one in your Supabase Dashboard -> Settings -> API."
+        )
 
     return await call_next(request)

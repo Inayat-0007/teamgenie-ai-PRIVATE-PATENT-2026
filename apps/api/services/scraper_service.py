@@ -167,6 +167,134 @@ async def _fetch_weather(venue_key: str = "default") -> str:
 class ScraperService:
     """JIT Intelligence Engine — zero-cost, zero-hallucination data injection."""
 
+    async def scrape_playing_xi(self, match_id: str, team_a: str = "", team_b: str = "") -> List[Dict[str, Any]]:
+        """
+        Master-Level JIT Roster Scraper.
+        Domain-restricted search + Structural entity filtering.
+        Cross-references scraped names against known player pool for real stats.
+        """
+        match_label = f"{team_a} vs {team_b}".strip() or match_id
+        # Restricted to trusted cricket domains to avoid noise
+        q = f'(site:espncricinfo.com OR site:cricbuzz.com OR site:sportskeeda.com) "{match_label}" probable playing XI today'
+        
+        logger.info("jit.roster_search", match_id=match_id, query=q)
+        raw_intel = await _ddg_search(q, max_results=10)
+        
+        if not raw_intel:
+            return []
+
+        import re
+        # Human Name Pattern: 2-3 capitalized words, no numbers, no dots (except initials)
+        potential_names = re.findall(r"\b[A-Z][a-z]+(?:\s[A-Z][a-z]+){1,2}\b", raw_intel)
+        
+        KNOWN_TEAMS = {
+            "Chennai", "Mumbai", "Bangalore", "Bengaluru", "Kolkata", "Delhi", "Rajasthan",
+            "Punjab", "Hyderabad", "Gujarat", "Lucknow", "Super", "Kings", "Indians",
+            "Royals", "Giants", "Titans", "Capitals", "Riders", "Knight", "Sunrisers"
+        }
+        
+        NON_PLAYER_WORDS = {
+            "Match", "Stadium", "India", "Live", "Daily", "Today", "Latest", "News", 
+            "Probable", "Toss", "Report", "Pitch", "Team", "Fantasy", "Prediction", 
+            "Versus", "Vs", "Result", "Venues", "IPL", "Cricketers", "Cricket", 
+            "Ukraine", "Russia", "Peace", "Deal", "Breaking", "Analysis", "Players",
+            "Politics", "Billion", "Deal", "Crisis", "Conflict", "World", "Ranking"
+        }
+        
+        unique_names = []
+        seen = set()
+        for n in potential_names:
+            words = set(re.findall(r"\w+", n))
+            
+            # 1. Reject if any word is a team name or stopword
+            if words.intersection(KNOWN_TEAMS) or words.intersection(NON_PLAYER_WORDS):
+                continue
+            
+            # 2. Reject if too long or looks like a title
+            if len(n) > 25 or len(n.split()) > 3:
+                continue
+                
+            # 3. Structural validation: Player names don't usually start with "The" or "A"
+            if n.startswith(("The ", "A ", "In ", "At ")):
+                continue
+
+            if n.lower() not in seen:
+                unique_names.append(n)
+                seen.add(n.lower())
+
+        # Defect #7 fix: Filter backup_stars by team membership
+        if len(unique_names) < 11:
+            logger.info("jit.padding_roster", found=len(unique_names))
+            # Map team abbreviations to franchise players
+            _TEAM_BACKUP_STARS: Dict[str, List[str]] = {
+                "CSK": ["Ruturaj Gaikwad", "Ravindra Jadeja", "Devon Conway", "Matheesha Pathirana", "Moeen Ali"],
+                "MI": ["Rohit Sharma", "Jasprit Bumrah", "Suryakumar Yadav", "Hardik Pandya", "Tim David"],
+                "RCB": ["Virat Kohli", "Mohammed Siraj", "Glenn Maxwell", "Faf Du Plessis", "Dinesh Karthik"],
+                "KKR": ["Rinku Singh", "Andre Russell", "Sunil Narine", "Phil Salt", "Mitchell Starc"],
+                "DC": ["Rishabh Pant", "Kuldeep Yadav", "Axar Patel", "Tristan Stubbs", "Jake Fraser Mcgurk"],
+                "RR": ["Sanju Samson", "Jos Buttler", "Yashasvi Jaiswal", "Yuzvendra Chahal", "Trent Boult"],
+                "GT": ["Shubman Gill", "Rashid Khan", "David Miller", "Mohammed Shami", "Wriddhiman Saha"],
+                "PBKS": ["Sam Curran", "Shikhar Dhawan", "Liam Livingstone", "Kagiso Rabada", "Jonny Bairstow"],
+                "SRH": ["Pat Cummins", "Heinrich Klaasen", "Travis Head", "Abhishek Sharma", "Bhuvneshwar Kumar"],
+                "LSG": ["Nicholas Pooran", "Quinton De Kock", "Marcus Stoinis", "Ravi Bishnoi", "Krunal Pandya"],
+            }
+            # Only pad with players from the two competing teams
+            for team_code in [team_a.upper(), team_b.upper()]:
+                stars = _TEAM_BACKUP_STARS.get(team_code, [])
+                for s in stars:
+                    if len(unique_names) >= 22:
+                        break
+                    if s.lower() not in seen:
+                        unique_names.append(s)
+                        seen.add(s.lower())
+
+        names = unique_names[:22]
+        
+        if not names:
+            return []
+
+        # Cross-reference against known player pool for REAL stats
+        from workers.harvester import _get_player_pool
+        known_pool = {p["name"].lower(): p for p in _get_player_pool()}
+
+        players = []
+        teams = [team_a or "TEAM_A", team_b or "TEAM_B"]
+
+        for i, name in enumerate(names):
+            p_team = teams[0] if i < len(names) / 2 else teams[1]
+            known = known_pool.get(name.lower())
+            
+            if known:
+                # Use REAL stats from curated pool
+                players.append({
+                    "id": known["id"],
+                    "name": known["name"],
+                    "role": known["role"],
+                    "price": known["price"],
+                    "predicted_points": known["predicted_points"],
+                    "ownership_pct": known["ownership_pct"],
+                    "team": known.get("team", p_team),
+                    "form_score": known.get("form_score", 50),
+                    "status": "active",
+                    "data_source": "curated_pool",
+                })
+            else:
+                # Unknown player: conservative defaults, clearly tagged
+                players.append({
+                    "id": name.lower().replace(" ", "_"),
+                    "name": name,
+                    "role": "batsman",  # Default, not round-robin
+                    "price": 7.0,       # Conservative base price
+                    "predicted_points": 35.0,  # Below-average baseline
+                    "ownership_pct": 5.0,      # Low ownership assumed
+                    "team": p_team,
+                    "form_score": 40,
+                    "status": "active",
+                    "data_source": "jit_estimated",
+                })
+            
+        return players
+
     async def get_match_context(
         self,
         match_id: str,
@@ -186,6 +314,35 @@ class ScraperService:
         if cached_full:
             logger.info("jit.cache_hit", match_id=match_id)
             return cached_full
+
+        # Fast Speed Increase: Try reading from harvester's DB cache
+        try:
+            from db.connection import execute_query
+            rows = await execute_query(
+                "SELECT intel_type, content, fetched_at FROM match_intelligence WHERE match_id = ?",
+                (match_id,)
+            )
+            if rows:
+                intel_dict = {row[0]: row[1] for row in rows}
+                # Check if we have the critical parts
+                if "pitch_report" in intel_dict and "weather" in intel_dict:
+                    logger.info("jit.db_cache_hit", match_id=match_id)
+                    context_block = (
+                        f"=== REAL-TIME INTELLIGENCE (Harvester Cache) ===\n"
+                        f"[PITCH & CONDITIONS]: {intel_dict.get('pitch_report', '')}\n"
+                        f"[WEATHER]: {intel_dict.get('weather', '')}\n"
+                        f"[INJURIES & SQUAD NEWS]: {intel_dict.get('injuries', '')}\n"
+                        f"[HEAD-TO-HEAD MATCHUPS]: {intel_dict.get('head_to_head', '')}\n"
+                        f"=== END INTELLIGENCE ==="
+                    )
+                    _match_cache[_cache_key(match_id, "full_context")] = {
+                        "data": context_block,
+                        "ts": time.time(),
+                    }
+                    _CACHE_TTL["full_context"] = 1800
+                    return context_block
+        except Exception as exc:
+            logger.warning("jit.db_cache_error", error=str(exc))
 
         logger.info("jit.searching", match_id=match_id, teams=f"{team_a} vs {team_b}")
 

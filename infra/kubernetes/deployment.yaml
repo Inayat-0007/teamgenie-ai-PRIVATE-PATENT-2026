@@ -52,17 +52,20 @@ spec:
           limits:
             cpu: "1000m"
             memory: "2Gi"
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
         livenessProbe:
           httpGet:
             path: /health
-            port: http
           initialDelaySeconds: 15
+            port: http
           periodSeconds: 30
           timeoutSeconds: 5
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /health
+            path: /ready
             port: http
           initialDelaySeconds: 5
           periodSeconds: 10
@@ -86,6 +89,11 @@ spec:
           allowPrivilegeEscalation: false
           capabilities:
             drop: ["ALL"]
+      volumes:
+      - name: tmp-volume
+        emptyDir:
+          medium: Memory
+          sizeLimit: 256Mi
 ---
 apiVersion: v1
 kind: Service
@@ -169,4 +177,24 @@ spec:
     - port: 8000
       protocol: TCP
   egress:
-  - to: []
+  # Allow DNS resolution (kube-dns)
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+  # Allow HTTPS outbound (Turso, Pinecone, Supabase, Redis, Sentry, LLMs)
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - port: 443
+      protocol: TCP
+    - port: 6379
+      protocol: TCP
