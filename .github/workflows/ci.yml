@@ -35,10 +35,12 @@ jobs:
           cache: 'pip'
           cache-dependency-path: apps/api/requirements.txt
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
       - name: Install dependencies
         run: |
-          pip install --upgrade pip setuptools wheel uv
-          uv pip install --system -r requirements.txt || pip install fastapi uvicorn pydantic pydantic-settings python-dotenv python-multipart python-jose httpx structlog tenacity pytest pytest-cov pytest-asyncio email-validator
+          uv pip install --system -r requirements.txt || uv pip install --system fastapi uvicorn pydantic pydantic-settings python-dotenv python-multipart python-jose httpx structlog tenacity pytest pytest-cov pytest-asyncio email-validator
           uv pip install --system black ruff
 
       - name: Lint (Ruff — fast)

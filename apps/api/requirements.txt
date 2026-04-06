@@ -27,15 +27,15 @@ upstash-redis>=1.0
 redis>=5.0,<6.0
 
 # --- AI / LLM ---
-langchain>=0.1,<1.0
-langchain-google-genai>=0.0.6
-langchain-anthropic>=0.1
-langchain-community>=0.0.10
-crewai>=0.28
-google-generativeai>=0.4
-anthropic>=0.18
-openai>=1.10
-cohere>=4.40
+langchain>=0.1,<0.3.0
+langchain-google-genai>=0.0.6,<1.1
+langchain-anthropic>=0.1,<0.2.0
+langchain-community>=0.0.10,<0.3.0
+crewai>=0.28,<1.0.0
+google-generativeai>=0.4,<0.6
+anthropic>=0.18,<0.30
+openai>=1.10,<2.0
+cohere>=4.40,<5.0
 
 # --- RAG ---
 sentence-transformers>=2.3,<3.0
