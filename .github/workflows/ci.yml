@@ -57,7 +57,7 @@ jobs:
           ENABLE_AI_FIREWALL: 'false'
           ENABLE_SELF_HEALING: 'false'
           PYTHONPATH: .
-        run: pytest tests/ -v --tb=short --no-header -q
+        run: pytest tests/ -v --tb=short --no-header -q --cov=. --cov-report=xml:coverage.xml
 
       - name: Upload coverage
         if: always()
