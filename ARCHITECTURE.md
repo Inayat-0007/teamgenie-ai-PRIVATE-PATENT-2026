@@ -1,7 +1,7 @@
 # 🏗️ TeamGenie AI — System Architecture
 
-**Last Updated:** January 2026  
-**Version:** 1.0.0  
+**Last Updated:** April 2026  
+**Version:** 3.0.0-rc1  
 **Author:** Mohammed Inayat Hussain Qureshi
 
 ---
