@@ -25,6 +25,21 @@ def client():
     with TestClient(app) as c:
         yield c
 
+@pytest.fixture(autouse=True)
+def mock_execute_query():
+    """Mock database queries to prevent real Turso requests during tests."""
+    async def fake_execute(query, params=None):
+        if "UPDATE" in query:
+            return []
+        elif "usage_date" in query:
+            return [("2026-04-06", 5)]
+        elif "SELECT email" in query:
+            return [("test@teamgenie.app", "Test User", "free", "2026-01-01T00:00:00Z")]
+        return []
+
+    with patch("db.connection.execute_query", new=fake_execute):
+        yield
+
 
 # ---------------------------------------------------------------------------
 # GET /api/user/me

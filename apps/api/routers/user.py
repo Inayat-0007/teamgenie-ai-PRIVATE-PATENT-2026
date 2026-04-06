@@ -9,6 +9,9 @@ import datetime
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import Optional
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 router = APIRouter()
 
