@@ -125,6 +125,13 @@ async def logout(http_request: Request):
 
 @router.post("/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest):
-    """Send password reset email."""
-    # Always return success (don't leak whether email exists)
+    """Send password reset email via Supabase."""
+    try:
+        from services.auth_service import AuthService
+
+        auth = AuthService()
+        await auth.reset_password(request.email)
+    except Exception:
+        pass
+
     return {"message": "If an account exists with this email, a password reset link has been sent."}

@@ -95,7 +95,10 @@ def _clean_snippets(raw_text: str) -> str:
 async def _ddg_search(query: str, max_results: int = 3) -> str:
     """Execute a DuckDuckGo text search and return cleaned snippets."""
     try:
-        from duckduckgo_search import DDGS
+        try:
+            from ddgs import DDGS
+        except ImportError:
+            from duckduckgo_search import DDGS
         results = await asyncio.to_thread(
             lambda: list(DDGS().text(query, max_results=max_results))
         )

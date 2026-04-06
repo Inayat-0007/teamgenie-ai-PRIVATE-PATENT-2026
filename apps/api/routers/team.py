@@ -143,7 +143,7 @@ async def generate_team(
             from services.subscription_service import subscription_service
             # Use the authenticated user's ID, not the per-request UUID
             quota_user_id = getattr(http_request.state, "user_id", request_id)
-            subscription_service.check_generation_quota(user_id=quota_user_id, tier=user_tier)
+            await subscription_service.check_generation_quota(user_id=quota_user_id, tier=user_tier)
         except ImportError:
             pass  # Subscription service not yet deployed
         except HTTPException:

@@ -40,31 +40,43 @@ TIER_LIMITS: Dict[str, Tuple[int, int]] = {
 
 
 # ---------------------------------------------------------------------------
-# In-Memory Quota Tracker (replaced by Turso in production)
+# Turso Quota Tracker (Production)
 # ---------------------------------------------------------------------------
 
-_usage: Dict[str, list] = defaultdict(list)
-
-
 class SubscriptionService:
-    """Tier-based quota enforcement and monetization engine."""
+    """Tier-based quota enforcement and monetization engine using Turso."""
 
-    def check_generation_quota(self, user_id: str, tier: str = "free") -> None:
+    async def check_generation_quota(self, user_id: str, tier: str = "free") -> None:
         """
         Check if user has remaining generation quota.
         Raises Exception if quota exceeded.
         """
+        from db.connection import execute_query
+        
         tier = tier.lower()
         limit, window = TIER_LIMITS.get(tier, TIER_LIMITS["free"])
 
-        now = time.time()
-        cutoff = now - window
-
-        # Prune old entries
-        _usage[user_id] = [ts for ts in _usage[user_id] if ts > cutoff]
-
-        current_count = len(_usage[user_id])
-
+        # Determine usage based on window vs database
+        # For simplicity, we track generations by CURRENT_DATE.
+        # If it's a 7-day window, sum the past 7 days. If 1 day (86400), check today's only.
+        days_to_check = 7 if window > 86400 else 1
+        
+        # Query total usage over the window window
+        query = """
+            SELECT SUM(generations_count) 
+            FROM daily_usage 
+            WHERE user_id = ? 
+            AND usage_date >= date('now', ?)
+        """
+        modifier = f"-{days_to_check - 1} days"
+        
+        try:
+            rows = await execute_query(query, (user_id, modifier))
+            current_count = rows[0][0] if rows and rows[0][0] is not None else 0
+        except Exception as e:
+            logger.error("turso.quota_query_failed", user_id=user_id, error=str(e))
+            current_count = 0  # Fail open if DB is unreachable temporarily so UX isn't broken
+            
         if current_count >= limit:
             logger.warning(
                 "quota.exceeded",
@@ -87,7 +99,18 @@ class SubscriptionService:
                 raise Exception(f"Generation limit reached for tier '{tier}'.")
 
         # Record usage
-        _usage[user_id].append(now)
+        try:
+            upsert_query = """
+                INSERT INTO daily_usage(user_id, usage_date, generations_count, api_calls)
+                VALUES (?, date('now'), 1, 1)
+                ON CONFLICT(user_id, usage_date) 
+                DO UPDATE SET 
+                  generations_count = generations_count + 1,
+                  api_calls = api_calls + 1
+            """
+            await execute_query(upsert_query, (user_id,))
+        except Exception as e:
+            logger.error("turso.quota_update_failed", user_id=user_id, error=str(e))
 
         logger.info(
             "quota.passed",
@@ -95,16 +118,31 @@ class SubscriptionService:
             tier=tier,
             used=current_count + 1,
             limit=limit,
-            remaining=limit - current_count - 1,
+            remaining=max(0, limit - current_count - 1),
         )
 
-    def get_usage_stats(self, user_id: str, tier: str = "free") -> dict:
-        """Return current usage statistics for a user."""
+    async def get_usage_stats(self, user_id: str, tier: str = "free") -> dict:
+        """Return current usage statistics for a user from Turso."""
+        from db.connection import execute_query
+        
         tier = tier.lower()
         limit, window = TIER_LIMITS.get(tier, TIER_LIMITS["free"])
-        now = time.time()
-        cutoff = now - window
-        current = len([ts for ts in _usage.get(user_id, []) if ts > cutoff])
+        days_to_check = 7 if window > 86400 else 1
+        
+        query = """
+            SELECT SUM(generations_count) 
+            FROM daily_usage 
+            WHERE user_id = ? 
+            AND usage_date >= date('now', ?)
+        """
+        modifier = f"-{days_to_check - 1} days"
+        
+        try:
+            rows = await execute_query(query, (user_id, modifier))
+            current = rows[0][0] if rows and rows[0][0] is not None else 0
+        except Exception as e:
+            logger.error("turso.quota_query_failed", user_id=user_id, error=str(e))
+            current = 0
 
         return {
             "user_id": user_id,
@@ -116,10 +154,14 @@ class SubscriptionService:
             "upgrade_url": "/pricing" if tier in ("free", "pro") else None,
         }
 
-    def reset_quota(self, user_id: str) -> None:
-        """Admin: reset a user's quota (for testing/support)."""
-        _usage[user_id] = []
-        logger.info("quota.reset", user_id=user_id)
+    async def reset_quota(self, user_id: str) -> None:
+        """Admin: reset a user's quota in Turso (for testing/support)."""
+        from db.connection import execute_query
+        try:
+            await execute_query("DELETE FROM daily_usage WHERE user_id = ?", (user_id,))
+            logger.info("quota.reset", user_id=user_id)
+        except Exception as e:
+            logger.error("turso.quota_reset_failed", user_id=user_id, error=str(e))
 
 
 subscription_service = SubscriptionService()

@@ -1,0 +1,11 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.14.3, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\moham\Music\DEPLOY V1 INAYAT\Gitlatestclone 4 march\teamgenie-ai-PRIVATE-PATENT-2026\apps\api
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.13.0
+collected 32 items
+
+tests\test_team.py ................................                      [100%]
+
+============================= 32 passed in 5.53s ==============================

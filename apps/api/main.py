@@ -89,9 +89,25 @@ async def lifespan(app: FastAPI):
         logger.warning("redis.connect_failed", error=str(exc)) if hasattr(logger, 'warning') else None
         app.state.cache = None
 
+    # Startup — Intelligence Harvester background scheduler (Agent 0)
+    # Runs every 30 minutes: scrapes live data → Turso DB + Redis → WebSocket
+    try:
+        from workers.harvester import start_background_harvester
+        await start_background_harvester(interval_minutes=30)
+        logger.info("harvester.background_scheduled", interval_min=30)
+    except Exception as exc:
+        logger.warning("harvester.startup_failed", error=str(exc))
+
     yield
 
-    # Shutdown
+    # Shutdown — stop harvester
+    try:
+        from workers.harvester import stop_background_harvester
+        await stop_background_harvester()
+    except Exception:
+        pass
+
+    # Shutdown — close Redis
     if hasattr(app.state, "cache") and app.state.cache:
         try:
             await app.state.cache.disconnect()
@@ -131,19 +147,7 @@ app = FastAPI(
 # Therefore we REGISTER them in REVERSE of the above (bottom-to-top):
 # ---------------------------------------------------------------------------
 
-# ── 8. CORS (registered first = executes last / innermost) ──
-_allowed_origins = os.getenv(
-    "ALLOWED_ORIGINS", "http://localhost:3000"
-).split(",")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[o.strip() for o in _allowed_origins],
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
-    expose_headers=["X-Request-ID", "X-Response-Time", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
-)
+# CORS will be registered at the very end to be the outermost middleware
 
 
 # ── 7. Request ID + timing + security headers (decorates every response) ──
@@ -196,6 +200,24 @@ app.middleware("http")(rate_limit_middleware)
 # ── 1. Prometheus metrics — outermost, times everything (no-op if not installed) ──
 if _metrics_middleware_available and metrics_middleware is not None:
     app.middleware("http")(metrics_middleware)
+
+# ── 0. CORS (registered last = executes first / outermost) ──
+# This MUST be the outermost middleware so it can attach headers to ALL responses,
+# including early error returns from the firewall, rate limiter, or error handler.
+_allowed_origins = os.getenv(
+    "ALLOWED_ORIGINS", "http://localhost:3000"
+).split(",")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _allowed_origins],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+    expose_headers=["X-Request-ID", "X-Response-Time", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
+)
+
+
 
 
 # ---------------------------------------------------------------------------

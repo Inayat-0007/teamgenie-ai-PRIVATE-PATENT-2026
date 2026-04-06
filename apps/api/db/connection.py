@@ -90,10 +90,20 @@ async def get_redis_client():
 
 
 async def execute_query(query: str, params: tuple = ()) -> list:
-    """Execute a parameterized Turso SQL query. Returns row list."""
+    """Execute a parameterized Turso SQL query. Returns row list for SELECTs, empty list for writes.
+    
+    Uses batch() instead of execute() to work around a KeyError: 'result' bug
+    in libsql_client 0.3.1's HTTP driver for INSERT/REPLACE statements.
+    """
+    from libsql_client import Statement
     client = await get_turso_client()
     try:
-        result = await client.execute(query, params)
-        return result.rows
+        stmt = Statement(query, list(params))
+        results = await client.batch([stmt])
+        if results and len(results) > 0:
+            rs = results[0]
+            if hasattr(rs, 'rows'):
+                return rs.rows
+        return []
     finally:
         await client.close()
