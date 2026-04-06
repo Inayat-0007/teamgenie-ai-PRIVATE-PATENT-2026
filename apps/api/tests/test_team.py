@@ -274,9 +274,10 @@ def test_team_output_constraint_validation():
 def test_team_output_valid_passes():
     from services.ai_service import _validate_team_output
 
+    roles_mix = ["batsman"]*4 + ["bowler"]*4 + ["wicket_keeper"]*1 + ["all_rounder"]*2
     valid_team = {
         "players": [
-            {"id": f"p{i}", "role": "batsman", "team": "MI" if i < 5 else "CSK"}
+            {"id": f"p{i}", "role": roles_mix[i], "team": "MI" if i < 5 else "CSK"}
             for i in range(11)
         ],
         "captain": "p0", "vice_captain": "p1",
