@@ -42,7 +42,8 @@ sentence-transformers>=2.3,<3.0
 llama-index>=0.10
 
 # --- Scraping ---
-playwright>=1.40
+# NOTE: playwright was removed in v3.0.2 (replaced by DuckDuckGo in Phase 5)
+# Saves ~150MB Docker image size and eliminates Chromium CVE surface
 beautifulsoup4>=4.12
 duckduckgo-search>=6.0
 

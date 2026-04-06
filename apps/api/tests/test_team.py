@@ -427,20 +427,24 @@ def test_auth_public_routes():
 
 
 def test_auth_token_revocation():
-    """Token revocation list should work correctly."""
+    """Token revocation list should work correctly (async functions called via asyncio.run)."""
+    import asyncio
     from middleware.auth import revoke_token, is_token_revoked, _revoked_tokens
 
     test_jti = "test_jti_abc123"
 
-    # Ensure clean state
-    _revoked_tokens.discard(test_jti)
-    assert is_token_revoked(test_jti) is False
+    async def _test():
+        # Ensure clean state
+        _revoked_tokens.discard(test_jti)
+        assert await is_token_revoked(test_jti) is False
 
-    revoke_token(test_jti)
-    assert is_token_revoked(test_jti) is True
+        await revoke_token(test_jti)
+        assert await is_token_revoked(test_jti) is True
 
-    # Cleanup
-    _revoked_tokens.discard(test_jti)
+        # Cleanup
+        _revoked_tokens.discard(test_jti)
+
+    asyncio.run(_test())
 
 
 # ---------------------------------------------------------------------------

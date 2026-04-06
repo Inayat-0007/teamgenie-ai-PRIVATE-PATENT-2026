@@ -115,7 +115,7 @@ async def logout(http_request: Request):
 
         jti = getattr(http_request.state, "token_jti", "")
         if jti:
-            revoke_token(jti)
+            await revoke_token(jti)
 
         return {"message": "Successfully logged out", "token_revoked": bool(jti)}
     except Exception:

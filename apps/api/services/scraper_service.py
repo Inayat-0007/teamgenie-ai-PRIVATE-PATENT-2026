@@ -62,7 +62,7 @@ def _set_cached(match_id: str, category: str, data: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Clickbait / Spam Filter
+# Clickbait / Spam / Prompt-Injection Filter (Security Fix 1.8)
 # ---------------------------------------------------------------------------
 
 _SPAM_PATTERNS = re.compile(
@@ -71,9 +71,27 @@ _SPAM_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
+# Prompt injection patterns — blocks attempts to hijack LLM via scraped web content
+_PROMPT_INJECTION_PATTERNS = re.compile(
+    r"(ignore previous instructions|ignore all instructions|you are now"
+    r"|system\s*:|assistant\s*:|forget everything|disregard|override"
+    r"|act as|pretend you are|new instructions|do not follow)",
+    re.IGNORECASE,
+)
+
+# HTML tag stripper
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+
 
 def _clean_snippets(raw_text: str) -> str:
-    """Remove clickbait sentences and normalize whitespace."""
+    """Remove HTML, clickbait, prompt injections, and normalize whitespace.
+    
+    Security: Scraped web content is sanitized before injection into LLM context
+    to prevent prompt injection attacks via malicious web pages.
+    """
+    # Step 1: Strip all HTML tags
+    raw_text = _HTML_TAG_RE.sub(" ", raw_text)
+    
     lines = raw_text.split(".")
     cleaned = []
     for line in lines:
@@ -82,9 +100,12 @@ def _clean_snippets(raw_text: str) -> str:
             continue
         if _SPAM_PATTERNS.search(line):
             continue
+        if _PROMPT_INJECTION_PATTERNS.search(line):
+            continue
         if line.endswith("?"):
             continue
-        cleaned.append(line)
+        # Truncate individual snippets to 500 chars max (prevents payload bombs)
+        cleaned.append(line[:500])
     return ". ".join(cleaned[:8]) + "." if cleaned else ""
 
 

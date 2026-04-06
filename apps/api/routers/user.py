@@ -107,21 +107,46 @@ async def export_data(request: Request):
     }
 
 
+class DeleteAccountRequest(BaseModel):
+    """Require password confirmation for irreversible account deletion."""
+    current_password: str = Field(..., min_length=1, max_length=200)
+
+
 @router.delete("/me")
-async def delete_account(request: Request):
-    """Permanently delete account (Right to be Forgotten compliance)."""
-    user_id = getattr(request.state, "user_id", "unknown")
+async def delete_account(request: DeleteAccountRequest, http_request: Request):
+    """Permanently delete account (Right to be Forgotten compliance).
     
-    if user_id != "unknown" and user_id != "demo":
-        from db.connection import execute_query
-        try:
-            # Cascade deletes ideally handled by foreign keys, but we'll prune usage manually first
-            await execute_query("DELETE FROM daily_usage WHERE user_id = ?", (user_id,))
-            await execute_query("DELETE FROM users WHERE id = ?", (user_id,))
-            logger.info("account.deleted", user_id=user_id)
-        except Exception as e:
-            logger.error("account.deletion_failed", user_id=user_id, error=str(e))
-            raise HTTPException(status_code=500, detail="Failed to delete account data")
+    Security Fix 1.7: Requires re-authentication via current_password
+    to prevent account deletion with a single stolen JWT.
+    """
+    user_id = getattr(http_request.state, "user_id", "unknown")
+    
+    if user_id == "unknown" or user_id == "demo":
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    # Re-authenticate before destructive action
+    try:
+        from services.auth_service import verify_password
+        is_valid = await verify_password(user_id, request.current_password)
+        if not is_valid:
+            raise HTTPException(status_code=403, detail="Invalid password — account deletion requires re-authentication")
+    except HTTPException:
+        raise
+    except Exception:
+        # If auth service is unavailable, still allow deletion in dev mode
+        import os
+        if os.getenv("PYTHON_ENV") == "production":
+            raise HTTPException(status_code=500, detail="Unable to verify identity")
+    
+    from db.connection import execute_query
+    try:
+        await execute_query("DELETE FROM daily_usage WHERE user_id = ?", (user_id,))
+        await execute_query("DELETE FROM subscriptions WHERE user_id = ?", (user_id,))
+        await execute_query("DELETE FROM users WHERE id = ?", (user_id,))
+        logger.info("account.deleted", user_id=user_id)
+    except Exception as e:
+        logger.error("account.deletion_failed", user_id=user_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Failed to delete account data")
             
     return {"message": "Account successfully permanently deleted.", "user_id": user_id}
 

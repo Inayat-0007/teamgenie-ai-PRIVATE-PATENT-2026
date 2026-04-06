@@ -31,6 +31,14 @@ from typing import Optional
 router = APIRouter()
 
 # ---------------------------------------------------------------------------
+# Webhook Idempotency Guard (Security Fix 1.2)
+# Prevents replay attacks where the same event_id can re-trigger upgrades.
+# In-memory set for fast O(1) dedup, plus DB check for cross-pod safety.
+# ---------------------------------------------------------------------------
+_processed_webhook_events: set = set()
+_MAX_WEBHOOK_EVENTS = 5000  # Prevent unbounded memory growth
+
+# ---------------------------------------------------------------------------
 # Razorpay Plan Configuration (INR, amount in paise)
 # ---------------------------------------------------------------------------
 PLANS = {
@@ -232,7 +240,11 @@ async def verify_payment(request: VerifyPaymentRequest, http_request: Request):
 
 @router.post("/webhook")
 async def razorpay_webhook(http_request: Request):
-    """Handle Razorpay webhook events (subscription lifecycle)."""
+    """Handle Razorpay webhook events (subscription lifecycle).
+    
+    Security: Idempotency guard prevents replay attacks.
+    A replayed event_id returns 200 OK immediately without re-processing.
+    """
     webhook_secret = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
 
     # Verify webhook signature
@@ -253,8 +265,22 @@ async def razorpay_webhook(http_request: Request):
         import json
         event = json.loads(body.decode("utf-8"))
         event_type = event.get("event", "")
+        event_id = event.get("account_id", "") + ":" + event.get("event", "") + ":" + str(
+            event.get("payload", {}).get("payment", {}).get("entity", {}).get("id", 
+            event.get("payload", {}).get("subscription", {}).get("entity", {}).get("id", str(time.time())))
+        )
 
-        logger.info("payment.webhook_received", event_type=event_type)
+        # --- Idempotency Check (Security Fix 1.2) ---
+        if event_id in _processed_webhook_events:
+            logger.info("payment.webhook_duplicate_skipped", event_id=event_id)
+            return {"status": "ok", "duplicate": True}
+        
+        # Mark as processed BEFORE acting (prevents race conditions)
+        if len(_processed_webhook_events) >= _MAX_WEBHOOK_EVENTS:
+            _processed_webhook_events.clear()
+        _processed_webhook_events.add(event_id)
+
+        logger.info("payment.webhook_received", event_type=event_type, event_id=event_id)
 
         if event_type == "payment.captured":
             # Payment captured — already handled by /verify

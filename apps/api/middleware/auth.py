@@ -5,8 +5,8 @@ Security layers:
   1. Public route bypass (exact + prefix match)
   2. HTTPS enforcement in production
   3. JWT decode with issuer and audience validation
-  4. Explicit expiration check with clock skew tolerance
-  5. In-memory token revocation list (logout support)
+  4. Explicit expiration check with clock skew tolerance (5s OWASP)
+  5. Redis-backed token revocation list (with in-memory fallback)
   6. User context injection into request.state
 """
 
@@ -58,27 +58,66 @@ PUBLIC_PREFIXES: tuple[str, ...] = (
 )
 
 # Clock skew tolerance for expiration checks (seconds)
-_CLOCK_SKEW_TOLERANCE = 30
+_CLOCK_SKEW_TOLERANCE = 5  # OWASP recommends ≤5s to limit stolen-token replay window
 
 # ---------------------------------------------------------------------------
-# In-Memory Token Revocation List (supports logout)
+# Redis-backed Token Revocation List (with in-memory fallback)
 # ---------------------------------------------------------------------------
-_revoked_tokens: Set[str] = set()
+_revoked_tokens: Set[str] = set()  # In-memory fallback when Redis is down
 _MAX_REVOCATION_LIST_SIZE = 10000  # Prevent unbounded memory growth
+_REVOCATION_TTL_SECONDS = 86400  # 24h — matches max JWT lifetime
+
+# Reference to app's Redis cache (set during first request)
+_redis_cache = None
 
 
-def revoke_token(token_jti: str) -> None:
-    """Add a token's JTI (unique ID) to the revocation list."""
+def _get_redis():
+    """Lazy-load Redis cache from the running app."""
+    global _redis_cache
+    if _redis_cache is not None:
+        return _redis_cache
+    try:
+        from fastapi import Request
+        # Will be set on first request via middleware
+    except Exception:
+        pass
+    return _redis_cache
+
+
+async def revoke_token(token_jti: str) -> None:
+    """Add a token's JTI to the revocation list (Redis-first, in-memory fallback)."""
+    # Always add to in-memory as a local fast-check layer
     if len(_revoked_tokens) >= _MAX_REVOCATION_LIST_SIZE:
-        # In production, this should be Redis-backed
         _revoked_tokens.clear()
         logger.warning("auth.revocation_list_reset", reason="max_size_exceeded")
     _revoked_tokens.add(token_jti)
 
+    # Persist to Redis so revocation survives pod restarts and works across replicas
+    redis = _get_redis()
+    if redis:
+        try:
+            await redis.set(f"revoked:{token_jti}", "1", ex=_REVOCATION_TTL_SECONDS)
+            logger.info("auth.token_revoked_redis", jti=token_jti)
+        except Exception as exc:
+            logger.warning("auth.redis_revoke_failed", jti=token_jti, error=str(exc))
 
-def is_token_revoked(token_jti: str) -> bool:
-    """Check if a token has been revoked."""
-    return token_jti in _revoked_tokens
+
+async def is_token_revoked(token_jti: str) -> bool:
+    """Check if a token has been revoked (Redis-first, in-memory fallback)."""
+    # Fast local check first
+    if token_jti in _revoked_tokens:
+        return True
+    # Check Redis for cross-pod revocations
+    redis = _get_redis()
+    if redis:
+        try:
+            result = await redis.get(f"revoked:{token_jti}")
+            if result:
+                _revoked_tokens.add(token_jti)  # Sync to local cache
+                return True
+        except Exception:
+            pass  # Redis down — rely on in-memory only
+    return False
 
 
 # ---------------------------------------------------------------------------
@@ -94,6 +133,11 @@ def _is_public_route(path: str) -> bool:
 
 async def verify_jwt(request: Request, call_next):
     """Verify Supabase JWT token from Authorization header."""
+
+    # Inject Redis cache reference for token revocation (lazy init)
+    global _redis_cache
+    if _redis_cache is None and hasattr(request.app.state, "cache") and request.app.state.cache:
+        _redis_cache = request.app.state.cache
 
     # Skip public routes and CORS preflight
     if _is_public_route(request.url.path) or request.method == "OPTIONS":
@@ -174,7 +218,7 @@ async def verify_jwt(request: Request, call_next):
 
         # Check token revocation (logout support)
         jti = payload.get("jti", "")
-        if jti and is_token_revoked(jti):
+        if jti and await is_token_revoked(jti):
             logger.info("auth.revoked_token_used", sub=payload.get("sub"), jti=jti)
             raise HTTPException(status_code=401, detail="Token has been revoked")
 

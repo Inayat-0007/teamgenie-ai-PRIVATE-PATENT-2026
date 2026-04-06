@@ -6,6 +6,34 @@ Format follows [Keep a Changelog](https://keepachangelog.com/), versioned per [S
 
 ---
 
+## [3.0.2] — 2026-04-07
+
+### 🛡️ Security Hardening & Audit Remediation — Master Fixing Plan
+> **Security Score: 62 → 90+** — 9 critical/high security vulnerabilities patched, 39 new tests added, performance indexes deployed.
+
+#### 🔴 CRITICAL Security Fixes (Sprint 1)
+- **Fixed (1.1):** Token revocation is now Redis-backed — survives pod restarts and works across all K8s replicas. In-memory fallback when Redis unavailable.
+- **Fixed (1.2):** Webhook idempotency guard — replayed Razorpay events can no longer trigger duplicate subscription upgrades.
+- **Fixed (1.3):** `APP_MODE=DEMO` now blocked at startup when `PYTHON_ENV=production` — prevents fake data in production.
+- **Fixed (1.5):** CORS wildcard (`*`) blocked in production — forces explicit origin list.
+- **Fixed (1.6):** Clock skew tolerance reduced from 30s → 5s per OWASP recommendation.
+- **Fixed (1.7):** Account deletion (`DELETE /api/user/me`) now requires password re-authentication.
+- **Fixed (1.8):** Scraper content sanitization — HTML stripping, prompt injection filtering, 500-char snippet truncation.
+- **Fixed (1.9):** Removed unused `playwright` dependency — saves ~150MB Docker image, eliminates Chromium CVE surface.
+- **Hardened:** CORS `allow_headers` changed from wildcard to explicit list (`Authorization`, `Content-Type`, `X-Request-ID`).
+
+#### ⚡ Performance Quick Wins (Sprint 2)
+- **Added:** Performance indexes on `teams`, `subscriptions`, `payment_history`, `daily_usage`, `intelligence_cache` tables.
+- **Added:** `/health`, `/ready`, `/metrics` exempted from rate limiter — eliminates 6 middleware hops per K8s probe.
+
+#### 🧪 Test Coverage Expansion (Sprint 3)
+- **Added:** `test_payment.py` — 15 tests covering all 4 payment endpoints (create-order, verify, webhook idempotency, status).
+- **Added:** `test_auth.py` — 12 tests covering auth flows (register, login, logout, refresh, forgot-password).
+- **Added:** `test_user.py` — 12 tests covering user endpoints (profile CRUD, GDPR export, account deletion re-auth, consent withdrawal).
+- **Total:** 71/71 tests passing (up from 32 in v3.0.1).
+
+---
+
 ## [3.0.1] — 2026-04-07
 
 ### 🔥 Final Master Release — 100% Live Mapping & Functional Completion

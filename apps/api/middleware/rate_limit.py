@@ -23,8 +23,8 @@ except ImportError:
 
 from fastapi import Request, HTTPException
 
-# Routes exempt from rate limiting
-_EXEMPT_PATHS: frozenset[str] = frozenset({"/health", "/docs", "/redoc", "/openapi.json"})
+# Routes exempt from rate limiting (health probes + monitoring — Performance Fix 2.2)
+_EXEMPT_PATHS: frozenset[str] = frozenset({"/health", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"})
 
 # ---------------------------------------------------------------------------
 # In-memory fallback rate limiter (used when Redis is unavailable)

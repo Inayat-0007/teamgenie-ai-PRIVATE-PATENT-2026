@@ -79,6 +79,15 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
     logger.info("api.starting", version=API_VERSION) if hasattr(logger, 'info') else None
 
+    # ── Security Fix 1.3: Block DEMO mode in production ──
+    if not IS_DEV and os.getenv("APP_MODE", "").upper() == "DEMO":
+        logger.critical(
+            "FATAL: APP_MODE=DEMO is not allowed when PYTHON_ENV=production. "
+            "This would serve fake/hallucinated data to real users. "
+            "Set APP_MODE=production or APP_MODE=hybrid to start."
+        )
+        raise RuntimeError("APP_MODE=DEMO is forbidden in production environment")
+
     # Startup — warm connections (graceful)
     try:
         from services.cache_service import CacheService
@@ -208,12 +217,21 @@ _allowed_origins = os.getenv(
     "CORS_ORIGINS", os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
 ).split(",")
 
+# ── Security Fix 1.5: Block wildcard CORS in production ──
+if not IS_DEV and "*" in [o.strip() for o in _allowed_origins]:
+    logger.critical(
+        "FATAL: CORS_ORIGINS=* is not allowed in production. "
+        "This disables all cross-origin protection. "
+        "Set CORS_ORIGINS to your specific frontend domains."
+    )
+    raise RuntimeError("CORS_ORIGINS=* is forbidden in production environment")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in _allowed_origins],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
     expose_headers=["X-Request-ID", "X-Response-Time", "X-RateLimit-Limit", "X-RateLimit-Remaining"],
 )
 
