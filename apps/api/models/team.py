@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class PlayerRole(str, Enum):
@@ -78,12 +78,26 @@ class TeamModel(BaseModel):
     predicted_points: Optional[float] = None
     actual_points: Optional[float] = None
 
-    @field_validator("vice_captain_id")
-    @classmethod
-    def captain_and_vice_must_differ(cls, v: str, info) -> str:
-        if v == info.data.get("captain_id"):
+    @model_validator(mode="after")
+    def validate_team_integrity(self) -> "TeamModel":
+        """Cross-field validation that requires access to multiple fields."""
+        # Captain and Vice-Captain must be different
+        if self.captain_id == self.vice_captain_id:
             raise ValueError("Captain and vice-captain must be different players")
-        return v
+
+        # Captain must be in the team
+        if self.captain_id not in self.players:
+            raise ValueError(f"Captain '{self.captain_id}' must be in the players list")
+
+        # Vice-Captain must be in the team
+        if self.vice_captain_id not in self.players:
+            raise ValueError(f"Vice-captain '{self.vice_captain_id}' must be in the players list")
+
+        # Players list must have unique IDs
+        if len(set(self.players)) != len(self.players):
+            raise ValueError("Player IDs must be unique — no duplicate selections allowed")
+
+        return self
 
 
 class MatchModel(BaseModel):
@@ -99,7 +113,7 @@ class MatchModel(BaseModel):
     @field_validator("team_b")
     @classmethod
     def teams_must_differ(cls, v: str, info) -> str:
-        if v == info.data.get("team_a"):
+        if "team_a" in info.data and v == info.data["team_a"]:
             raise ValueError("team_a and team_b must be different")
         return v
 

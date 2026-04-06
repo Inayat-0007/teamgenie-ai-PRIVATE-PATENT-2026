@@ -18,7 +18,7 @@
 
   <p>
     <img src="https://img.shields.io/badge/Engine-v3.0.0-success?style=for-the-badge&logo=rocket" alt="Engine" />
-    <img src="https://img.shields.io/badge/Tests-9%2F9_Passing-brightgreen?style=for-the-badge&logo=checkmarx" alt="Tests" />
+    <img src="https://img.shields.io/badge/Tests-32%2F32_Passing-brightgreen?style=for-the-badge&logo=checkmarx" alt="Tests" />
     <img src="https://img.shields.io/badge/Latency-4ms-blue?style=for-the-badge&logo=speedtest" alt="Latency" />
     <img src="https://img.shields.io/badge/Agents-3_CrewAI-orange?style=for-the-badge&logo=openai" alt="Agents" />
     <img src="https://img.shields.io/badge/CI-All_Green-brightgreen?style=for-the-badge&logo=github-actions" alt="CI" />
@@ -28,6 +28,24 @@
 </div>
 
 ---
+
+## 🔥 Recent Updates — v2.1.0 (April 6, 2026)
+
+> **Forensic Security Audit & Architecture Hardening** — 24 bugs/vulnerabilities found and fixed.
+
+| Category | Key Changes |
+|----------|-------------|
+| 🛡️ **AI Firewall** | Complete rewrite with 6 security layers: body size limits (1MB), content-type validation, CRLF header injection detection, per-IP violation tracking with auto-ban, SSRF blocking, expanded attack patterns |
+| 🔐 **JWT Auth** | HTTPS enforcement, algorithm whitelist, token revocation (logout works!), issuer validation, clock-skew tolerance |
+| ⚡ **Custom Exceptions** | New `core/exceptions.py` — 8 typed exception classes with automatic HTTP status mapping |
+| 🧪 **Testing** | 9 → **32 tests** covering: firewall attacks, auth, data validation, anti-hallucination, security headers, input sanitization |
+| 🚫 **Anti-Hallucination** | Player data validation pipeline, post-generation constraint checker, auto-heal safety net |
+| 🔒 **Security Headers** | CSP, HSTS, X-Frame-Options, X-XSS-Protection, nosniff — on every response |
+| 📝 **Error Handling** | Traceback truncation (4KB max), sensitive data redaction, environment-aware client messages |
+| 🌐 **Production Lockdown** | `/docs` disabled, `/diagnostics` blocked, `/ready` sanitized, CORS tightened |
+
+> 📋 Full details: **[CHANGELOG.md](CHANGELOG.md)**
+
 
 ## 🚀 Features (v3.0 Master Release)
 
@@ -148,10 +166,11 @@ This framework utilizes a Defense-in-Depth methodology where security inherently
 | Layer | Implementation | Status | Description Enforcement |
 |-------|-----------|--------|--------|
 | **Monetization Engine** | 3-Tier JWT Quota System | 🟢 Active | Disables generations based on: Free (2/wk), Pro (3/day), Elite (Unl). |
-| **Edge Protection** | Cloudflare Worker / AI Firewall | 🟢 Active | Geo-blocks banned regions. Analyzes payloads via 10 Regex patterns (SQLi, XSS, Prompt Injection). |
-| **Authentication** | Supabase JWT (HS256) | 🟢 Active | Cryptographically verifies User Tier claims at the FastAPI routing middleware before AI executes. |
+| **Edge Protection** | Cloudflare Worker / AI Firewall v2 | 🟢 Active | 6-layer firewall: body size limits, content-type validation, CRLF detection, IP auto-ban, SSRF blocking, 20+ regex patterns (SQLi, XSS, Prompt Injection). |
+| **Authentication** | Supabase JWT (HS256) + Hardened Middleware | 🟢 Active | HTTPS enforcement, algorithm whitelist, token revocation, issuer validation, clock-skew tolerance. |
 | **Frontend Paywalls** | CSS Backdrop Blurring | 🟢 Active | Obscures response payload from free users, leveraging psychological hooks to drive subscriptions. |
-| **API Resilience** | Tenacity Circuit Breakers | 🟢 Active | 3-retry + exponential backoff + graceful fallback. Prevents cascading failures to LLM APIs. |
+| **API Resilience** | Tenacity Circuit Breakers + Timeouts | 🟢 Active | 30s agent timeouts, 10s JIT timeout, per-agent failure recovery, `return_exceptions=True` with greedy fallback. |
+| **Security Headers** | Defense-in-Depth | 🟢 Active | CSP, HSTS, X-Frame-Options, X-XSS-Protection, nosniff, Referrer-Policy on every response. |
 
 ---
 

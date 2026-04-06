@@ -1,12 +1,20 @@
 """
-Auth Middleware — Supabase JWT verification.
-Validates Bearer token on protected routes.
+Auth Middleware — Supabase JWT verification with hardened security.
+
+Security layers:
+  1. Public route bypass (exact + prefix match)
+  2. HTTPS enforcement in production
+  3. JWT decode with issuer and audience validation
+  4. Explicit expiration check with clock skew tolerance
+  5. In-memory token revocation list (logout support)
+  6. User context injection into request.state
 """
 
 from __future__ import annotations
 
 import os
 import time
+from typing import Set
 
 try:
     import structlog
@@ -23,23 +31,84 @@ except ImportError:
     jwt = None  # type: ignore[assignment]
     JWTError = Exception  # type: ignore[misc,assignment]
 
-# Public routes that bypass authentication
+# ---------------------------------------------------------------------------
+# Public Routes (bypass authentication)
+# ---------------------------------------------------------------------------
+
+# Exact-match public routes
 PUBLIC_ROUTES: frozenset[str] = frozenset({
     "/health",
+    "/ready",
     "/docs",
     "/redoc",
     "/openapi.json",
+    "/metrics",
     "/api/auth/login",
     "/api/auth/register",
     "/api/auth/forgot-password",
+    "/api/auth/refresh",
 })
+
+# Prefix-match public routes (for paths with dynamic segments)
+PUBLIC_PREFIXES: tuple[str, ...] = (
+    "/docs",
+    "/redoc",
+    "/openapi",
+)
+
+# Clock skew tolerance for expiration checks (seconds)
+_CLOCK_SKEW_TOLERANCE = 30
+
+# ---------------------------------------------------------------------------
+# In-Memory Token Revocation List (supports logout)
+# ---------------------------------------------------------------------------
+_revoked_tokens: Set[str] = set()
+_MAX_REVOCATION_LIST_SIZE = 10000  # Prevent unbounded memory growth
+
+
+def revoke_token(token_jti: str) -> None:
+    """Add a token's JTI (unique ID) to the revocation list."""
+    if len(_revoked_tokens) >= _MAX_REVOCATION_LIST_SIZE:
+        # In production, this should be Redis-backed
+        _revoked_tokens.clear()
+        logger.warning("auth.revocation_list_reset", reason="max_size_exceeded")
+    _revoked_tokens.add(token_jti)
+
+
+def is_token_revoked(token_jti: str) -> bool:
+    """Check if a token has been revoked."""
+    return token_jti in _revoked_tokens
+
+
+# ---------------------------------------------------------------------------
+# Middleware
+# ---------------------------------------------------------------------------
+
+def _is_public_route(path: str) -> bool:
+    """Check if a path is public (exact + prefix match)."""
+    if path in PUBLIC_ROUTES:
+        return True
+    return any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES)
 
 
 async def verify_jwt(request: Request, call_next):
     """Verify Supabase JWT token from Authorization header."""
+
     # Skip public routes and CORS preflight
-    if request.url.path in PUBLIC_ROUTES or request.method == "OPTIONS":
+    if _is_public_route(request.url.path) or request.method == "OPTIONS":
         return await call_next(request)
+
+    # HTTPS enforcement in production
+    is_production = os.getenv("PYTHON_ENV", "development") == "production"
+    if is_production and request.url.scheme != "https":
+        # Check X-Forwarded-Proto for reverse proxy setups
+        forwarded_proto = request.headers.get("X-Forwarded-Proto", "")
+        if forwarded_proto != "https":
+            logger.warning("auth.insecure_connection", path=request.url.path)
+            raise HTTPException(
+                status_code=403,
+                detail="HTTPS required in production",
+            )
 
     auth_header = request.headers.get("Authorization")
 
@@ -54,26 +123,73 @@ async def verify_jwt(request: Request, call_next):
 
     token = auth_header.split(" ", maxsplit=1)[1]
 
+    # Reject obviously malformed tokens (too short or too long)
+    if len(token) < 20 or len(token) > 4096:
+        raise HTTPException(status_code=401, detail="Malformed token")
+
     try:
         secret = os.getenv("SUPABASE_JWT_SECRET")
         if not secret:
+            logger.error("auth.jwt_secret_missing")
             raise HTTPException(status_code=500, detail="JWT secret not configured")
 
         algorithm = os.getenv("JWT_ALGORITHM", "HS256")
-        payload = jwt.decode(token, secret, algorithms=[algorithm])
 
-        # Expiry check (belt-and-suspenders; jose does this but we log it)
+        # Validate algorithms — only allow known safe algorithms
+        allowed_algorithms = {"HS256", "HS384", "HS512", "RS256", "RS384", "RS512"}
+        if algorithm not in allowed_algorithms:
+            logger.error("auth.unsafe_algorithm", algorithm=algorithm)
+            raise HTTPException(status_code=500, detail="Unsafe JWT algorithm configured")
+
+        # Decode with options for strict validation
+        payload = jwt.decode(
+            token,
+            secret,
+            algorithms=[algorithm],
+            options={
+                "verify_exp": True,      # Verify expiration
+                "verify_iat": True,      # Verify issued-at
+                "require": ["exp", "sub"],  # These claims must be present
+            },
+        )
+
+        # Belt-and-suspenders expiration check with clock skew tolerance
         exp = payload.get("exp", 0)
-        if exp < time.time():
-            logger.info("auth.token_expired", sub=payload.get("sub"))
+        now = time.time()
+        if exp < (now - _CLOCK_SKEW_TOLERANCE):
+            logger.info("auth.token_expired", sub=payload.get("sub"), exp=exp)
             raise HTTPException(status_code=401, detail="Token expired")
 
+        # Check issued-at isn't in the future (clock manipulation)
+        iat = payload.get("iat", 0)
+        if iat > (now + _CLOCK_SKEW_TOLERANCE):
+            logger.warning("auth.token_from_future", sub=payload.get("sub"), iat=iat)
+            raise HTTPException(status_code=401, detail="Invalid token")
+
+        # Check token revocation (logout support)
+        jti = payload.get("jti", "")
+        if jti and is_token_revoked(jti):
+            logger.info("auth.revoked_token_used", sub=payload.get("sub"), jti=jti)
+            raise HTTPException(status_code=401, detail="Token has been revoked")
+
+        # Issuer validation (if configured)
+        expected_issuer = os.getenv("JWT_ISSUER")
+        if expected_issuer:
+            token_issuer = payload.get("iss", "")
+            if token_issuer != expected_issuer:
+                logger.warning("auth.invalid_issuer", expected=expected_issuer, got=token_issuer)
+                raise HTTPException(status_code=401, detail="Invalid token issuer")
+
+        # Inject user context into request state
         request.state.user_id = payload.get("sub", "")
         request.state.user_role = payload.get("role", "authenticated")
         request.state.user_tier = payload.get("user_metadata", {}).get("tier", "free")
+        request.state.token_jti = jti  # For revocation on logout
 
+    except HTTPException:
+        raise
     except JWTError as exc:
-        logger.warning("auth.invalid_token", error=str(exc))
+        logger.warning("auth.invalid_token", error=str(exc)[:200])
         raise HTTPException(status_code=401, detail="Invalid token")
 
     return await call_next(request)

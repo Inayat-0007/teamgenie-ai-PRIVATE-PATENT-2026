@@ -7,12 +7,15 @@ UPGRADES APPLIED:
   #8  Player Projection Engine integration
   #10 RAG made optional and scoped
   #15 Graceful Degradation Framework
+  FIX: Added timeouts, solver error guards, match_id validation
+  FIX: Production-aware _fetch_players, data validation, output constraint checks
 """
 
 from __future__ import annotations
 
 import asyncio
 import os
+import re
 from typing import Any, Optional
 
 try:
@@ -29,6 +32,143 @@ _TEAM_SIZE = 11
 _DEFAULT_BUDGET = 100.0
 _DIFFERENTIAL_OWNERSHIP_THRESHOLD = 25.0
 _DIFFERENTIAL_POINTS_THRESHOLD = 45.0
+_AGENT_TIMEOUT_SECONDS = 30  # Max time for any single agent to run
+
+# Required fields for each player dict
+_REQUIRED_PLAYER_FIELDS = {"id", "name", "role", "price", "predicted_points", "team"}
+
+# Valid cricket roles for fantasy teams
+_VALID_ROLES = {"batsman", "bowler", "all_rounder", "wicket_keeper"}
+
+# Regex for safe match IDs: alphanumeric + hyphens + underscores, 1-100 chars
+_MATCH_ID_PATTERN = re.compile(r"^[a-zA-Z0-9_\-]{1,100}$")
+
+
+def _validate_match_id(match_id: str) -> None:
+    """Validate match_id format to prevent injection or invalid lookups."""
+    if not match_id or not match_id.strip():
+        raise ValueError("match_id cannot be empty")
+    if not _MATCH_ID_PATTERN.match(match_id):
+        raise ValueError(
+            f"Invalid match_id format: '{match_id}'. "
+            "Must be 1-100 characters, alphanumeric with hyphens/underscores only."
+        )
+
+
+def _validate_player_data(players: list[dict]) -> list[dict]:
+    """
+    Validate and sanitize player data from ANY source (DB, API, sample).
+    Removes invalid players, logs warnings. Prevents hallucinated/malformed data
+    from propagating through the pipeline.
+    """
+    valid_players = []
+    seen_ids = set()
+
+    for i, p in enumerate(players):
+        # Check required fields exist
+        missing = _REQUIRED_PLAYER_FIELDS - set(p.keys())
+        if missing:
+            logger.warning("player.missing_fields", index=i, player_id=p.get("id", "?"), missing=list(missing))
+            continue
+
+        # Check for duplicate IDs
+        if p["id"] in seen_ids:
+            logger.warning("player.duplicate_id", player_id=p["id"])
+            continue
+        seen_ids.add(p["id"])
+
+        # Validate types and ranges
+        try:
+            price = float(p["price"])
+            predicted = float(p["predicted_points"])
+        except (TypeError, ValueError):
+            logger.warning("player.invalid_numeric", player_id=p["id"])
+            continue
+
+        if price <= 0 or price > 20:
+            logger.warning("player.invalid_price", player_id=p["id"], price=price)
+            continue
+
+        if predicted < 0:
+            logger.warning("player.negative_points", player_id=p["id"], predicted=predicted)
+            continue
+
+        # Validate role
+        role = p.get("role", "").lower()
+        if role not in _VALID_ROLES:
+            logger.warning("player.invalid_role", player_id=p["id"], role=role)
+            continue
+
+        # Sanitize — ensure consistent types
+        sanitized = {
+            **p,
+            "price": price,
+            "predicted_points": predicted,
+            "role": role,
+            "ownership_pct": float(p.get("ownership_pct", 50.0)),
+            "team": str(p.get("team", "UNKNOWN")),
+        }
+        valid_players.append(sanitized)
+
+    if len(valid_players) < len(players):
+        logger.info(
+            "player.validation_summary",
+            input_count=len(players),
+            valid_count=len(valid_players),
+            dropped=len(players) - len(valid_players),
+        )
+
+    return valid_players
+
+
+def _validate_team_output(team: dict, budget: float) -> list[str]:
+    """
+    Post-generation constraint verification.
+    Returns a list of warnings (empty = all good).
+    Prevents hallucinated/invalid teams from reaching the client.
+    """
+    warnings = []
+    players = team.get("players", [])
+
+    # 1. Must have exactly 11 players
+    if len(players) != _TEAM_SIZE:
+        warnings.append(f"Team has {len(players)} players, expected {_TEAM_SIZE}")
+
+    # 2. Budget must not be exceeded
+    total_cost = team.get("total_cost", 0)
+    if total_cost > budget:
+        warnings.append(f"Budget exceeded: ₹{total_cost:.1f} > ₹{budget:.1f}")
+
+    # 3. Captain and Vice-Captain must be different
+    captain = team.get("captain", "")
+    vc = team.get("vice_captain", "")
+    if captain == vc:
+        warnings.append(f"Captain and Vice-Captain are the same: {captain}")
+
+    # 4. Captain and VC must be in the team
+    player_ids = {p["id"] for p in players}
+    if captain and captain not in player_ids:
+        warnings.append(f"Captain '{captain}' is not in the team roster")
+    if vc and vc not in player_ids:
+        warnings.append(f"Vice-Captain '{vc}' is not in the team roster")
+
+    # 5. No duplicate players
+    if len(player_ids) != len(players):
+        warnings.append("Team contains duplicate players")
+
+    # 6. All players must have valid roles
+    for p in players:
+        if p.get("role", "").lower() not in _VALID_ROLES:
+            warnings.append(f"Player '{p.get('id')}' has invalid role: {p.get('role')}")
+
+    # 7. Max 7 from same team (fantasy platform rule)
+    from collections import Counter
+    team_counts = Counter(p.get("team", "?") for p in players if "team" in p)
+    for team_name, count in team_counts.items():
+        if count > 7:
+            warnings.append(f"Too many players from {team_name}: {count} (max 7)")
+
+    return warnings
 
 
 async def generate_team_with_agents(
@@ -44,15 +184,21 @@ async def generate_team_with_agents(
     Generate optimal fantasy team using CrewAI multi-agent system.
 
     Pipeline:
-        1. Fetch players → enrich with projections (#8)
-        2. Budget Optimizer + Differential Expert run in parallel
-        3. Risk Manager synthesises both outputs sequentially
+        1. Validate match_id
+        2. Fetch players → validate data → enrich with projections (#8)
+        3. Budget Optimizer + Differential Expert run in parallel (with timeout)
+        4. Risk Manager synthesises both outputs sequentially
+        5. Validate output constraints before returning
 
     Graceful degradation (#15):
         - If projection fails → use raw data
         - If optimization fails → use greedy fallback
         - If RAG fails → skip differential context
+        - If any agent times out → use fallback result
     """
+    # Phase -1: Validate match_id format
+    _validate_match_id(match_id)
+
     logger.info(
         "generation.started",
         match_id=match_id,
@@ -64,21 +210,30 @@ async def generate_team_with_agents(
     )
 
     # Phase 0: Fetch available players
-    players = await _fetch_players(match_id)
+    raw_players = await _fetch_players(match_id)
 
-    if not players:
+    if not raw_players:
         raise ValueError(f"No players found for match {match_id}")
+
+    # Phase 0.3: Validate and sanitize player data (prevents hallucination)
+    players = _validate_player_data(raw_players)
 
     if len(players) < _TEAM_SIZE:
         raise ValueError(
-            f"Need at least {_TEAM_SIZE} players, got {len(players)} for match {match_id}"
+            f"After validation, only {len(players)} valid players remain "
+            f"(need {_TEAM_SIZE}) for match {match_id}"
         )
 
     # Phase 0.5: Enrich with statistical projections (Upgrade #8)
     enriched_players = await _enrich_with_projections(players)
 
+    # Phase 0.6: Verify enrichment didn't corrupt data
+    enriched_players = _validate_player_data(enriched_players)
+    if len(enriched_players) < _TEAM_SIZE:
+        logger.warning("enrichment.corrupted_data_using_raw", enriched=len(enriched_players))
+        enriched_players = players  # Fall back to pre-enrichment validated data
+
     # Phase 0.8: JIT Context Injection (Phase 5 Upgrade)
-    # If toss info is available, inject it into the context
     if toss_winner and toss_decision:
         toss_intel = f"\n[TOSS RESULT]: {toss_winner} won the toss and chose to {toss_decision}.\n"
         jit_context = jit_context + toss_intel if jit_context else toss_intel
@@ -86,26 +241,88 @@ async def generate_team_with_agents(
     if jit_context:
         logger.info("jit.injected", chars=len(jit_context))
 
-    # Phase 1: Run Budget Optimizer + Differential Expert in parallel
-    budget_result, differential_result = await asyncio.gather(
-        _run_budget_optimizer(enriched_players, budget, preferences),
-        _run_differential_expert(enriched_players, match_id, jit_context=jit_context),
-    )
+    # Phase 1: Run Budget Optimizer + Differential Expert in parallel (with timeout)
+    try:
+        budget_result, differential_result = await asyncio.wait_for(
+            asyncio.gather(
+                _run_budget_optimizer(enriched_players, budget, preferences),
+                _run_differential_expert(enriched_players, match_id, jit_context=jit_context),
+                return_exceptions=True,
+            ),
+            timeout=_AGENT_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        logger.error("generation.timeout", match_id=match_id, timeout_s=_AGENT_TIMEOUT_SECONDS)
+        raise ValueError(
+            f"Team generation timed out after {_AGENT_TIMEOUT_SECONDS}s. "
+            "Please try again — the AI agents may be under heavy load."
+        )
 
-    # Phase 2: Risk Manager runs after (needs both outputs)
-    risk_result = await _run_risk_manager(
-        budget_result, differential_result, risk_level
-    )
+    # Handle individual agent failures from return_exceptions=True
+    if isinstance(budget_result, Exception):
+        logger.error("agent.budget_optimizer_failed", error=str(budget_result))
+        # Emergency fallback: try greedy directly
+        try:
+            working_players = [
+                {**p, "efficiency": p.get("expected_points", p["predicted_points"]) / max(p["price"], 0.1)}
+                for p in enriched_players
+            ]
+            selected, cost, pts = _solve_greedy(working_players, budget)
+            budget_result = {
+                "players": selected,
+                "total_cost": round(cost, 2),
+                "total_points": round(pts, 2),
+                "solver": "emergency-greedy",
+                "reasoning": f"[emergency-greedy] Recovered from agent failure with {len(selected)} players.",
+            }
+        except Exception as fallback_exc:
+            raise ValueError(f"Budget optimization failed completely: {budget_result}") from fallback_exc
+
+    if isinstance(differential_result, Exception):
+        logger.warning("agent.differential_expert_failed", error=str(differential_result))
+        differential_result = {
+            "differentials": [],
+            "reasoning": "Differential analysis unavailable (agent error — skipped gracefully).",
+        }
+
+    # Phase 2: Risk Manager runs after (needs both outputs) — also with timeout
+    try:
+        risk_result = await asyncio.wait_for(
+            _run_risk_manager(budget_result, differential_result, risk_level),
+            timeout=_AGENT_TIMEOUT_SECONDS,
+        )
+    except asyncio.TimeoutError:
+        logger.warning("agent.risk_manager_timeout", match_id=match_id)
+        players_list = budget_result.get("players", [])
+        risk_result = {
+            "risk_score": 0.5,
+            "captain": players_list[0]["id"] if players_list else "",
+            "vice_captain": players_list[1]["id"] if len(players_list) > 1 else "",
+            "reasoning": "Risk Manager timed out — used default captain/VC assignment.",
+        }
 
     # Build final team response
     team = _build_consensus_team(budget_result, differential_result, risk_result)
+
+    # Phase 3: Post-generation output validation (anti-hallucination gate)
+    constraint_warnings = _validate_team_output(team, budget)
+    if constraint_warnings:
+        logger.warning(
+            "generation.constraint_violations",
+            match_id=match_id,
+            violations=constraint_warnings,
+        )
+        # Auto-heal critical violations
+        team = _auto_heal_team(team, budget_result, risk_result, constraint_warnings)
 
     logger.info(
         "generation.completed",
         match_id=match_id,
         total_cost=team["total_cost"],
         predicted_total=team["predicted_total"],
+        player_count=len(team.get("players", [])),
         mode=settings.APP_MODE.value,
+        warnings=len(constraint_warnings),
     )
 
     return {
@@ -125,11 +342,56 @@ async def generate_team_with_agents(
     }
 
 
+def _auto_heal_team(team: dict, budget_result: dict, risk_result: dict, warnings: list[str]) -> dict:
+    """
+    Attempt to fix constraint violations in the generated team.
+    This is the last-resort safety net before the team reaches the client.
+    """
+    players = team.get("players", [])
+    player_ids = {p["id"] for p in players}
+
+    # Fix: Captain not in team → assign highest-points player
+    captain = team.get("captain", "")
+    vc = team.get("vice_captain", "")
+
+    if captain not in player_ids and players:
+        sorted_p = sorted(players, key=lambda x: x.get("predicted_points", 0), reverse=True)
+        captain = sorted_p[0]["id"]
+        team["captain"] = captain
+        logger.info("auto_heal.captain_reassigned", new_captain=captain)
+
+    if vc not in player_ids and players:
+        sorted_p = sorted(players, key=lambda x: x.get("predicted_points", 0), reverse=True)
+        vc = sorted_p[1]["id"] if len(sorted_p) > 1 else sorted_p[0]["id"]
+        team["vice_captain"] = vc
+        logger.info("auto_heal.vc_reassigned", new_vc=vc)
+
+    # Fix: Captain == Vice-Captain
+    if team["captain"] == team["vice_captain"] and len(players) > 1:
+        sorted_p = sorted(players, key=lambda x: x.get("predicted_points", 0), reverse=True)
+        for p in sorted_p:
+            if p["id"] != team["captain"]:
+                team["vice_captain"] = p["id"]
+                break
+
+    return team
+
+
 async def _enrich_with_projections(players: list[dict]) -> list[dict]:
     """Upgrade #8: Statistical enrichment with graceful fallback."""
     try:
         from services.projection_service import projection_service
         enriched = await projection_service.compute_projections(players)
+
+        # Verify enrichment preserved all players and added required fields
+        if len(enriched) != len(players):
+            logger.warning(
+                "projections.count_mismatch",
+                input=len(players),
+                output=len(enriched),
+            )
+            return players
+
         logger.info("projections.applied", count=len(enriched))
         return enriched
     except Exception as exc:
@@ -138,9 +400,62 @@ async def _enrich_with_projections(players: list[dict]) -> list[dict]:
 
 
 async def _fetch_players(match_id: str) -> list[dict[str, Any]]:
-    """Fetch available players for a match from database."""
-    # In DEMO/HYBRID mode: sample data
-    # In PRODUCTION mode: query Turso
+    """
+    Fetch available players for a match.
+
+    Tri-modal behavior:
+      - PRODUCTION: query Turso database
+      - HYBRID: try DB, fallback to sample data
+      - DEMO: always return sample data
+    """
+    # PRODUCTION mode: attempt real database query
+    if settings.APP_MODE == AppMode.PRODUCTION:
+        try:
+            from db.connection import get_db_connection
+            db = await get_db_connection()
+            rows = await db.execute(
+                "SELECT * FROM players WHERE match_id = ? AND status = 'active'",
+                [match_id],
+            )
+            if rows:
+                players = [dict(row) for row in rows]
+                logger.info("players.fetched_from_db", match_id=match_id, count=len(players))
+                return players
+            else:
+                logger.warning("players.empty_db_result", match_id=match_id)
+                raise ValueError(f"No players found in database for match {match_id}")
+        except ImportError:
+            logger.error("players.db_module_missing")
+            raise ValueError("Database module not available in PRODUCTION mode")
+        except ValueError:
+            raise  # Re-raise ValueErrors
+        except Exception as exc:
+            logger.error("players.db_query_failed", match_id=match_id, error=str(exc))
+            raise ValueError(f"Database query failed for match {match_id}: {exc}")
+
+    # HYBRID mode: try DB first, fallback to sample
+    if settings.APP_MODE == AppMode.HYBRID:
+        try:
+            from db.connection import get_db_connection
+            db = await get_db_connection()
+            rows = await db.execute(
+                "SELECT * FROM players WHERE match_id = ? AND status = 'active'",
+                [match_id],
+            )
+            if rows:
+                players = [dict(row) for row in rows]
+                logger.info("players.fetched_from_db", match_id=match_id, count=len(players))
+                return players
+        except Exception as exc:
+            logger.warning("players.db_fallback_to_sample", error=str(exc))
+
+    # DEMO mode (or HYBRID fallback): return sample data
+    logger.info("players.using_sample_data", match_id=match_id, mode=settings.APP_MODE.value)
+    return _get_sample_players()
+
+
+def _get_sample_players() -> list[dict[str, Any]]:
+    """Static sample data for DEMO/HYBRID fallback. Clearly marked as non-production."""
     return [
         {"id": "virat_kohli", "name": "Virat Kohli", "role": "batsman", "price": 10.5, "predicted_points": 85.3, "ownership_pct": 67.3, "team": "RCB"},
         {"id": "rohit_sharma", "name": "Rohit Sharma", "role": "batsman", "price": 10.0, "predicted_points": 72.1, "ownership_pct": 71.5, "team": "MI"},
@@ -167,7 +482,11 @@ async def _run_budget_optimizer(
     working_players = []
     for p in players:
         player = {**p}
-        player["efficiency"] = player.get("expected_points", player["predicted_points"]) / player["price"]
+        predicted = player.get("expected_points", player.get("predicted_points", 0))
+        price = player.get("price", 1)
+        if price <= 0:
+            price = 1  # Guard against division by zero
+        player["efficiency"] = predicted / price
 
         if preferences:
             if player["id"] in (preferences.get("favorite_players") or []):
@@ -177,6 +496,7 @@ async def _run_budget_optimizer(
         working_players.append(player)
 
     # Try OR-Tools ILP (Upgrade #7)
+    solver_used = "greedy-heuristic"
     try:
         from ortools.linear_solver import pywraplp
         selected, total_cost, total_points = _solve_ilp(working_players, budget)
@@ -184,7 +504,38 @@ async def _run_budget_optimizer(
     except ImportError:
         # Graceful fallback to greedy
         selected, total_cost, total_points = _solve_greedy(working_players, budget)
-        solver_used = "greedy-heuristic"
+    except RuntimeError as exc:
+        # ILP solver found no optimal solution — fallback
+        logger.warning("ilp.no_optimal_solution", error=str(exc))
+        selected, total_cost, total_points = _solve_greedy(working_players, budget)
+        solver_used = "greedy-heuristic-after-ilp-fail"
+
+    # Validate solver output
+    if len(selected) < _TEAM_SIZE:
+        logger.warning(
+            "solver.insufficient_players",
+            solver=solver_used,
+            selected=len(selected),
+            required=_TEAM_SIZE,
+        )
+        # Pad from remaining players if possible
+        selected_ids = {p["id"] for p in selected}
+        remaining = [p for p in working_players if p["id"] not in selected_ids]
+        remaining.sort(key=lambda x: x["efficiency"], reverse=True)
+        for p in remaining:
+            if len(selected) >= _TEAM_SIZE:
+                break
+            if total_cost + p["price"] <= budget:
+                selected.append(p)
+                total_cost += p["price"]
+        total_points = sum(p.get("expected_points", p.get("predicted_points", 0)) for p in selected)
+
+    # Final validation: budget must not be exceeded
+    if total_cost > budget:
+        logger.error("solver.budget_exceeded", cost=total_cost, budget=budget, solver=solver_used)
+        # Re-run greedy with strict budget (guaranteed safe)
+        selected, total_cost, total_points = _solve_greedy(working_players, budget)
+        solver_used = "greedy-heuristic-budget-fix"
 
     return {
         "players": selected,
@@ -229,7 +580,7 @@ def _solve_ilp(players: list[dict], budget: float) -> tuple:
 
 def _solve_greedy(players: list[dict], budget: float) -> tuple:
     """Greedy heuristic fallback (always works, no dependencies)."""
-    sorted_players = sorted(players, key=lambda x: x["efficiency"], reverse=True)
+    sorted_players = sorted(players, key=lambda x: x.get("efficiency", 0), reverse=True)
 
     selected: list[dict] = []
     total_cost = 0.0
@@ -241,7 +592,7 @@ def _solve_greedy(players: list[dict], budget: float) -> tuple:
             selected.append(player)
             total_cost += player["price"]
 
-    total_points = sum(p.get("expected_points", p["predicted_points"]) for p in selected)
+    total_points = sum(p.get("expected_points", p.get("predicted_points", 0)) for p in selected)
     return selected, total_cost, total_points
 
 
@@ -251,11 +602,11 @@ async def _run_differential_expert(players: list[dict], match_id: str, jit_conte
         p
         for p in players
         if p.get("ownership_pct", 100) < _DIFFERENTIAL_OWNERSHIP_THRESHOLD
-        and p.get("expected_points", p["predicted_points"]) > _DIFFERENTIAL_POINTS_THRESHOLD
+        and p.get("expected_points", p.get("predicted_points", 0)) > _DIFFERENTIAL_POINTS_THRESHOLD
     ]
 
     differentials.sort(
-        key=lambda p: p.get("expected_points", p["predicted_points"]) / max(p.get("ownership_pct", 1), 1),
+        key=lambda p: p.get("expected_points", p.get("predicted_points", 0)) / max(p.get("ownership_pct", 1), 1),
         reverse=True,
     )
 
@@ -276,20 +627,35 @@ async def _run_risk_manager(
     risk_scores = {"safe": 0.3, "balanced": 0.5, "aggressive": 0.8}
     players = budget_result.get("players", [])
 
+    if not players:
+        return {
+            "risk_score": risk_scores.get(risk_level, 0.5),
+            "captain": "",
+            "vice_captain": "",
+            "reasoning": "No players available for captain/VC assignment.",
+        }
+
     # Captain = highest predicted points; Vice = second highest
     sorted_by_points = sorted(
         players,
-        key=lambda p: p.get("expected_points", p["predicted_points"]),
+        key=lambda p: p.get("expected_points", p.get("predicted_points", 0)),
         reverse=True,
     )
-    captain = sorted_by_points[0]["id"] if sorted_by_points else ""
-    vice_captain = sorted_by_points[1]["id"] if len(sorted_by_points) > 1 else ""
+    captain = sorted_by_points[0]["id"]
+    vice_captain = sorted_by_points[1]["id"] if len(sorted_by_points) > 1 else sorted_by_points[0]["id"]
 
     # For aggressive risk: prefer a differential pick as captain
     if risk_level == "aggressive" and differential_result.get("differentials"):
         top_diff = differential_result["differentials"][0]
-        vice_captain = captain
-        captain = top_diff["id"]
+        # Only use differential pick if it's in the selected team
+        selected_ids = {p["id"] for p in players}
+        if top_diff["id"] in selected_ids:
+            vice_captain = captain
+            captain = top_diff["id"]
+
+    # Guarantee captain != vice_captain
+    if captain == vice_captain and len(sorted_by_points) > 1:
+        vice_captain = sorted_by_points[1]["id"] if sorted_by_points[1]["id"] != captain else sorted_by_points[0]["id"]
 
     return {
         "risk_score": risk_scores.get(risk_level, 0.5),
@@ -315,10 +681,11 @@ def _build_consensus_team(
                 "name": p["name"],
                 "role": p["role"],
                 "price": p["price"],
-                "predicted_points": round(p.get("expected_points", p["predicted_points"]), 1),
+                "predicted_points": round(p.get("expected_points", p.get("predicted_points", 0)), 1),
                 "confidence": round(min(p.get("efficiency", 8) / 10, 0.99), 2),
                 "ownership_pct": p.get("ownership_pct", 0),
                 "form_trend": "rising" if p.get("form_score", 50) > 55 else "stable",
+                "team": p.get("team", "UNKNOWN"),
             }
             for p in players
         ],

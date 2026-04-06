@@ -1,209 +1,164 @@
-# 📋 Changelog
+# Changelog
 
-All notable changes to TeamGenie AI will be documented in this file.
+All notable changes to **TeamGenie AI** are documented here.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
----
-
-## [Unreleased]
-
-### Planned
-- Football (soccer) support
-- iOS native app
-- Tipster API marketplace
-- Adaptive learning (user personalization)
+Format follows [Keep a Changelog](https://keepachangelog.com/), versioned per [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [1.0.0] - 2026-01-15
+## [2.1.0] — 2026-04-06
 
-### 🎉 Initial Release
+### 🛡️ Security Hardening — Forensic Audit & Remediation
 
-**TeamGenie AI — Fantasy Sports Intelligence Platform**
-
-#### Added
-
-**Core Platform**
-- Multi-agent AI architecture using CrewAI with 3 specialized agents
-  - Budget Optimizer (Google OR-Tools + Gemini 2.0 Flash)
-  - Differential Expert (RAG + Gemini 2.0 Flash)
-  - Risk Manager (Claude 3.7 Haiku + Monte Carlo simulation)
-- Advanced RAG pipeline with parallel index retrieval (<300ms total)
-- Team generation endpoint with <5 second response time
-- 72% prediction accuracy (backtested on 10K+ matches)
-
-**Backend (FastAPI)**
-- RESTful API with full OpenAPI documentation
-- JWT authentication via Supabase
-- AI-powered firewall (Claude analyzes all requests)
-- Self-healing middleware (auto-fixes production errors)
-- Rate limiting via Upstash Redis
-- CORS security headers
-
-**Frontend (Next.js 14)**
-- Server-side rendering with React Server Components
-- Responsive design (mobile-first)
-- Real-time match updates via WebSockets
-- Framer Motion animations
-- Dark mode support
-
-**Databases**
-- Turso (LibSQL) as primary database with multi-region replication
-- Supabase Postgres for authentication and realtime
-- Upstash Redis for caching and rate limiting
-- Pinecone for vector embeddings and similarity search
-
-**Security**
-- Defense-in-depth architecture (6 layers)
-- Cloudflare DDoS protection (unlimited)
-- End-to-end encryption (AES-256 at rest, TLS 1.3 in transit)
-- Row-Level Security (RLS) for data isolation
-- PII tokenization for payment data
-- Secrets management via Doppler
-
-**Infrastructure**
-- Multi-cloud deployment (Vercel + Render + Cloudflare)
-- Edge computing via Cloudflare Workers (300+ locations)
-- Docker containerization for local development
-- GitHub Actions CI/CD pipeline
-- Automated security scanning
-
-**Monitoring & Observability**
-- Axiom for structured logging (1TB/month free)
-- Sentry for error tracking (5K errors/month free)
-- PostHog for product analytics (1M events/month free)
-- Better Stack for uptime monitoring
-- OpenTelemetry for distributed tracing
-
-**Documentation**
-- Complete README with architecture diagrams
-- System architecture document
-- API reference with examples
-- Database schema with migrations
-- Security policy with bug bounty
-- Deployment guide (production & local)
-- Contributing guidelines
-- Legal compliance documentation
-
-**Compliance**
-- DPDP Act 2023 (India) compliance
-- GDPR compliance for EU users
-- State-wise geo-blocking for restricted states
-- Age verification (18+)
-- Responsible gaming features
+> **24 bugs/vulnerabilities found and fixed** across 10 files.  
+> **32 automated tests** — all passing.  
+> Audit scope: Middleware stack, authentication, input validation, error handling, AI pipeline, data integrity.
 
 ---
 
-## [0.9.0] - 2026-01-10
+### 🔴 Critical Fixes
 
-### Added
-- Beta testing with 100 users
-- Performance benchmarking suite
-- Load testing with k6
+#### Middleware Execution Order (Security Risk)
+- **Fixed:** FastAPI middleware was registered in wrong order — Auth ran BEFORE Rate Limiter and AI Firewall, allowing malicious/abusive requests to waste JWT verification CPU before being blocked.
+- **New order (LIFO-correct):** Prometheus → Rate Limiter → AI Firewall → Auth → Self-Healing → Error Handler → Request Metadata → CORS
 
-### Fixed
-- RAG query latency reduced from 800ms to 300ms (parallel retrieval)
-- Memory leak in CrewAI agent orchestration
-- Race condition in Redis cache invalidation
+#### AI Firewall — Complete Rewrite (`security/ai_firewall.py`)
+- **Added:** Request body size limit (1MB max, configurable) — prevents payload bomb attacks
+- **Added:** Content-Type validation for POST/PUT/PATCH — rejects non-JSON with 415
+- **Added:** HTTP header injection (CRLF) detection
+- **Added:** Per-IP violation tracking with automatic temp-ban (5 violations in 10 min)
+- **Added:** SSRF pattern blocking (127.0.0.1, localhost, ::1)
+- **Expanded:** Attack patterns — DELETE FROM, OR 1=1, backtick command exec, URL-encoded path traversal
+- **Added:** X-Forwarded-For support for correct IP extraction behind reverse proxies
 
----
+#### JWT Authentication — Complete Rewrite (`middleware/auth.py`)
+- **Added:** HTTPS enforcement in production (403 if not HTTPS)
+- **Added:** JWT algorithm whitelist — only HS256/384/512, RS256/384/512
+- **Added:** Token revocation list (JTI-based) — logout actually works now
+- **Added:** Issuer validation via `JWT_ISSUER` env var
+- **Added:** Issued-at (iat) future-check — blocks clock manipulation attacks
+- **Added:** 30-second clock skew tolerance on expiration checks
+- **Added:** Token length validation (rejects < 20 or > 4096 chars)
+- **Added:** Prefix-based public route matching (supports /docs/*, etc.)
 
-## [0.8.0] - 2026-01-05
+#### Sentry Initialization — Hardened (`main.py`)
+- **Fixed:** `sentry_sdk.capture_exception()` was called on `None` when SDK not installed
+- **Added:** `_sentry_available` boolean flag checked before every Sentry call
+- **Added:** Explicit warning logs when Sentry is unavailable
 
-### Added
-- Self-healing scraper (AI auto-fixes broken selectors)
-- Playwright-based data ingestion pipeline
-- AI-powered data validation (Claude quality checks)
+#### Pydantic v2 Validation — Fixed (`models/team.py`)
+- **Fixed:** Replaced broken `@field_validator` with `@model_validator(mode="after")`
+- **Added:** Captain/Vice-Captain must be different players
+- **Added:** Both must exist in the players list
+- **Added:** No duplicate player IDs allowed
 
-### Changed
-- Migrated from single LLM to multi-agent architecture
-- Switched from Supabase to Turso as primary database
-
----
-
-## [0.7.0] - 2025-12-28
-
-### Added
-- CrewAI multi-agent framework integration
-- Budget optimization agent (OR-Tools ILP solver)
-- Differential analysis agent (RAG-based)
-- Risk assessment agent (Monte Carlo simulation)
-
-### Changed
-- Improved prediction accuracy from 55% to 72%
-
----
-
-## [0.6.0] - 2025-12-20
-
-### Added
-- Advanced RAG pipeline with 4 parallel indexes
-- Pinecone vector database integration
-- Cohere re-ranking for improved retrieval quality
-- Semantic caching for similar queries
+#### match_id Injection — Fixed (`routers/team.py`, `services/ai_service.py`)
+- **Added:** Regex pattern `^[a-zA-Z0-9_\-]+$` at Pydantic model layer
+- **Added:** Defense-in-depth validation at service layer
+- **Added:** `max_length=100` on all optional string fields
 
 ---
 
-## [0.5.0] - 2025-12-15
+### 🟡 High Priority Fixes
 
-### Added
-- FastAPI backend with async endpoints
-- Supabase authentication (JWT, OAuth)
-- Basic team generation (single LLM)
-- Player stats API
+#### Custom Exception Hierarchy — NEW (`core/exceptions.py`)
+- **Created:** 8 typed exception classes: `AuthenticationError` (401), `AuthorizationError` (403), `ValidationError` (422), `NotFoundError` (404), `QuotaExceededError` (429), `ExternalServiceError` (502), `GenerationError` (500), `FirewallBlockedError` (403)
+- **All inherit** from `TeamGenieError` base class with `status_code` and `error_code`
+- **Error handler** and FastAPI exception handlers both map these automatically
 
----
+#### Auth Service — Hardened (`services/auth_service.py`)
+- **Added:** Email regex validation BEFORE calling Supabase
+- **Added:** Password strength validation in service layer
+- **Fixed:** Error messages sanitized — never expose Supabase internals to client
+- **Fixed:** Email partially masked in logs for privacy (`use***@...`)
+- **Added:** Defensive session null-checks
+- **Replaced:** Raw `ValueError` with typed `AuthenticationError`, `ValidationError`, `ExternalServiceError`
 
-## [0.4.0] - 2025-12-10
+#### Auth Router — Consistent Errors + Real Logout (`routers/auth.py`)
+- **Fixed:** All endpoints now catch `TeamGenieError` → proper `{code, message}` format
+- **Fixed:** Logout actually calls `revoke_token(jti)` instead of being a no-op
+- **Fixed:** Forgot-password returns `"If an account exists..."` — no email existence leak
 
-### Added
-- Next.js 14 frontend with App Router
-- Responsive UI components
-- Dark mode theme
-- Framer Motion animations
+#### AI Service — Anti-Hallucination Pipeline (`services/ai_service.py`)
+- **Added:** `_validate_player_data()` — checks required fields, types, ranges, duplicates, roles
+- **Added:** `_validate_team_output()` — 7 post-generation constraint checks
+- **Added:** `_auto_heal_team()` — last-resort safety net for captain/VC reassignment
+- **Added:** Production-aware `_fetch_players()` (PRODUCTION → DB, HYBRID → DB+fallback, DEMO → sample)
+- **Added:** Enrichment consistency verification
+- **Added:** `asyncio.wait_for(timeout=30s)` on all agent calls
+- **Added:** `return_exceptions=True` with per-agent failure recovery
+- **Fixed:** Division-by-zero guard on player price
 
----
-
-## [0.3.0] - 2025-12-05
-
-### Added
-- Cloudflare Workers edge functions
-- DDoS protection configuration
-- WAF rules for OWASP Top 10
-- CDN for static asset caching
-
----
-
-## [0.2.0] - 2025-12-01
-
-### Added
-- Docker development environment
-- docker-compose.yml for local services
-- Database migration system (dbmate)
-- Initial SQL schemas
+#### Error Handler — Traceback Safety (`middleware/error_handler.py`)
+- **Added:** Traceback truncation (4000 char max)
+- **Added:** Sensitive data redaction (API_KEY, SECRET, TOKEN, PASSWORD, DSN patterns)
+- **Added:** `TeamGenieError` → proper status code mapping
+- **Added:** Environment-aware client messages (error type in dev, generic in production)
 
 ---
 
-## [0.1.0] - 2025-11-25
+### 🟢 Medium/Low Priority Fixes
 
-### Added
-- Project initialization
-- Repository structure
-- Initial documentation
-- AGPL-3.0 license
+#### Production Endpoint Lockdown (`main.py`)
+- `/docs` and `/redoc` disabled in production
+- `/diagnostics` returns 403 unless `IS_DEV`
+- `/ready` returns minimal info in production (no infrastructure details)
+
+#### Security Headers (`main.py`)
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `X-XSS-Protection: 1; mode=block`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Strict-Transport-Security: max-age=31536000` (production only)
+- `Content-Security-Policy: default-src 'self'` (production only)
+
+#### CORS Tightened (`main.py`)
+- `allow_methods` restricted to `GET, POST, PUT, DELETE, OPTIONS` (was `*`)
+- `allow_headers` restricted to `Authorization, Content-Type, X-Request-ID` (was `*`)
+- `expose_headers` added for rate-limit headers
+
+#### Router Error Handling (`routers/team.py`)
+- HTTPException from quota check no longer swallowed by generic handler
+- JIT scraper wrapped in `asyncio.wait_for(timeout=10s)`
+- Error messages no longer leak raw Python exception details
+- `error_type` added to logs for faster debugging
 
 ---
 
-[Unreleased]: https://github.com/Inayat-0007/teamgenie-ai/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v1.0.0
-[0.9.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v0.9.0
-[0.8.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v0.8.0
-[0.7.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v0.7.0
-[0.6.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v0.6.0
-[0.5.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v0.5.0
-[0.4.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v0.4.0
-[0.3.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v0.3.0
-[0.2.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v0.2.0
-[0.1.0]: https://github.com/Inayat-0007/teamgenie-ai/releases/tag/v0.1.0
+### 📋 Testing
+
+| Category | Count |
+|----------|-------|
+| Health / Readiness / Diagnostics | 3 |
+| Team generation + validation | 9 |
+| match_id format validation | 4 |
+| Security headers | 2 |
+| Data validation (anti-hallucination) | 6 |
+| Custom exception types | 2 |
+| Firewall (attack detection, IP tracking) | 3 |
+| Auth (public routes, token revocation) | 2 |
+| Auth service (email, password) | 2 |
+| Information leakage prevention | 1 |
+| **Total** | **32** |
+
+---
+
+### 📁 Files Changed
+
+| File | Action |
+|------|--------|
+| `apps/api/core/exceptions.py` | ✨ **NEW** — Custom exception hierarchy |
+| `apps/api/main.py` | 🔧 Middleware order, Sentry, security headers, CORS, endpoint lockdown |
+| `apps/api/middleware/auth.py` | 🔧 HTTPS, revocation, issuer, algorithm whitelist |
+| `apps/api/middleware/error_handler.py` | 🔧 Traceback safety, TeamGenieError support |
+| `apps/api/models/team.py` | 🔧 Pydantic v2 model_validator fix |
+| `apps/api/routers/auth.py` | 🔧 Custom exceptions, real logout, anti-leak |
+| `apps/api/routers/team.py` | 🔧 match_id regex, JIT timeout, HTTPException passthrough |
+| `apps/api/security/ai_firewall.py` | 🔧 6 security layers, IP tracking, SSRF |
+| `apps/api/services/ai_service.py` | 🔧 Data validation, constraint checks, auto-heal |
+| `apps/api/services/auth_service.py` | 🔧 Custom exceptions, input validation |
+| `apps/api/tests/test_team.py` | 🧪 32 tests (was ~9) |
+
+---
+
+*Audited and remediated by Mohammed Inayat Hussain Qureshi — April 6, 2026*

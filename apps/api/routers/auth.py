@@ -1,5 +1,6 @@
 """
 Auth Router — Supabase JWT authentication.
+Uses custom exception types for consistent error responses.
 """
 
 from __future__ import annotations
@@ -8,10 +9,12 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 try:
-    import email_validator  # noqa: F401 — verify email-validator is installed before using EmailStr
+    import email_validator  # noqa: F401
     from pydantic import EmailStr
 except ImportError:
     EmailStr = str  # type: ignore[misc,assignment]
+
+from core.exceptions import TeamGenieError
 
 router = APIRouter()
 
@@ -35,7 +38,7 @@ class TokenResponse(BaseModel):
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str
+    refresh_token: str = Field(min_length=1, max_length=4096)
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -51,10 +54,16 @@ async def login(request: LoginRequest):
         auth = AuthService()
         result = await auth.sign_in(request.email, request.password)
         return result
-    except ValueError as exc:
+    except TeamGenieError as exc:
+        # Map custom exception → HTTP status
         raise HTTPException(
-            status_code=401,
-            detail={"code": "invalid_credentials", "message": str(exc)},
+            status_code=exc.status_code,
+            detail={"code": exc.error_code, "message": exc.message},
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "internal_error", "message": "An unexpected error occurred."},
         )
 
 
@@ -66,8 +75,16 @@ async def register(request: RegisterRequest):
 
         auth = AuthService()
         return await auth.sign_up(request.email, request.password, request.full_name)
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
+    except TeamGenieError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.error_code, "message": exc.message},
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "internal_error", "message": "Registration failed."},
+        )
 
 
 @router.post("/refresh")
@@ -78,17 +95,36 @@ async def refresh_token(request: RefreshRequest):
 
         auth = AuthService()
         return await auth.refresh(request.refresh_token)
-    except ValueError as exc:
-        raise HTTPException(status_code=401, detail=str(exc))
+    except TeamGenieError as exc:
+        raise HTTPException(
+            status_code=exc.status_code,
+            detail={"code": exc.error_code, "message": exc.message},
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail={"code": "internal_error", "message": "Token refresh failed."},
+        )
 
 
 @router.post("/logout")
-async def logout():
-    """Invalidate current session."""
-    return {"message": "Successfully logged out"}
+async def logout(http_request: Request):
+    """Invalidate current session by revoking the token JTI."""
+    try:
+        from middleware.auth import revoke_token
+
+        jti = getattr(http_request.state, "token_jti", "")
+        if jti:
+            revoke_token(jti)
+
+        return {"message": "Successfully logged out", "token_revoked": bool(jti)}
+    except Exception:
+        # Logout should never fail from user perspective
+        return {"message": "Successfully logged out", "token_revoked": False}
 
 
 @router.post("/forgot-password")
 async def forgot_password(request: ForgotPasswordRequest):
     """Send password reset email."""
-    return {"message": "Password reset email sent. Check your inbox."}
+    # Always return success (don't leak whether email exists)
+    return {"message": "If an account exists with this email, a password reset link has been sent."}
