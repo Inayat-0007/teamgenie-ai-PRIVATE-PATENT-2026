@@ -34,9 +34,7 @@ def configure_logging():
 
     structlog.configure(
         processors=processors,
-        wrapper_class=structlog.make_filtering_bound_logger(
-            structlog.get_config().get("min_level", 0)
-        ),
+        wrapper_class=structlog.make_filtering_bound_logger(structlog.get_config().get("min_level", 0)),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(file=sys.stderr),
         cache_logger_on_first_use=True,

@@ -10,9 +10,7 @@ Exposes GET /metrics in Prometheus text format for monitoring:
 
 from __future__ import annotations
 
-import time
 from collections import defaultdict
-from typing import Dict
 
 from fastapi import APIRouter, Response
 
@@ -22,9 +20,9 @@ router = APIRouter()
 # Simple In-Memory Metrics (replaced by prometheus_client in production)
 # ---------------------------------------------------------------------------
 
-_counters: Dict[str, int] = defaultdict(int)
-_histograms: Dict[str, list] = defaultdict(list)
-_gauges: Dict[str, float] = defaultdict(float)
+_counters: dict[str, int] = defaultdict(int)
+_histograms: dict[str, list] = defaultdict(list)
+_gauges: dict[str, float] = defaultdict(float)
 
 
 def inc(name: str, labels: str = "", value: int = 1) -> None:
@@ -52,12 +50,13 @@ def set_gauge(name: str, value: float, labels: str = "") -> None:
 # /metrics endpoint
 # ---------------------------------------------------------------------------
 
+
 @router.get("/metrics")
 async def prometheus_metrics():
     """Expose metrics in Prometheus text exposition format."""
     lines = [
         "# HELP teamgenie_info TeamGenie AI platform metadata",
-        '# TYPE teamgenie_info gauge',
+        "# TYPE teamgenie_info gauge",
         'teamgenie_info{version="2.0.0",phase="8"} 1',
         "",
     ]

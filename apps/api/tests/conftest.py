@@ -16,11 +16,12 @@ os.environ["ENABLE_AI_FIREWALL"] = "false"
 os.environ["ENABLE_SELF_HEALING"] = "false"
 os.environ["SUPABASE_JWT_SECRET"] = "test-jwt-secret-for-ci"
 
-import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+from unittest.mock import AsyncMock, patch
 
-from main import app  # noqa: E402
-from unittest.mock import AsyncMock, patch  # noqa: E402
+import pytest
+from fastapi.testclient import TestClient
+
+from main import app
 
 
 @pytest.fixture

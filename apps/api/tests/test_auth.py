@@ -14,9 +14,11 @@ os.environ["ENABLE_AI_FIREWALL"] = "false"
 os.environ["ENABLE_SELF_HEALING"] = "false"
 os.environ["SUPABASE_JWT_SECRET"] = "test-jwt-secret-for-ci"
 
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
+
 from main import app
 
 
@@ -29,6 +31,7 @@ def client():
 # ---------------------------------------------------------------------------
 # POST /api/auth/register
 # ---------------------------------------------------------------------------
+
 
 def test_register_requires_email_and_password(client):
     """Registration should require both email and password."""
@@ -44,25 +47,19 @@ def test_register_missing_password(client):
 
 def test_register_invalid_email_format(client):
     """Registration with invalid email should be rejected."""
-    response = client.post("/api/auth/register", json={
-        "email": "not-an-email",
-        "password": "securepass123"
-    })
+    response = client.post("/api/auth/register", json={"email": "not-an-email", "password": "securepass123"})
     # Should be either 422 (Pydantic validation) or 400 (app validation)
     assert response.status_code in (400, 422)
 
 
-@patch('services.auth_service.AuthService.sign_up', new_callable=AsyncMock)
+@patch("services.auth_service.AuthService.sign_up", new_callable=AsyncMock)
 def test_register_valid_user(mock_sign_up, client):
     """Valid registration should succeed with mocked Supabase."""
     mock_sign_up.return_value = {
         "user": {"id": "test-user-id", "email": "new@test.com"},
-        "session": {"access_token": "fake_token", "refresh_token": "fake_refresh"}
+        "session": {"access_token": "fake_token", "refresh_token": "fake_refresh"},
     }
-    response = client.post("/api/auth/register", json={
-        "email": "new@test.com",
-        "password": "securepass123"
-    })
+    response = client.post("/api/auth/register", json={"email": "new@test.com", "password": "securepass123"})
     # Should succeed (201) or return error if Supabase not configured
     assert response.status_code in (200, 201, 500)
 
@@ -70,6 +67,7 @@ def test_register_valid_user(mock_sign_up, client):
 # ---------------------------------------------------------------------------
 # POST /api/auth/login
 # ---------------------------------------------------------------------------
+
 
 def test_login_requires_email_and_password(client):
     """Login should require both email and password."""
@@ -83,25 +81,23 @@ def test_login_missing_email(client):
     assert response.status_code == 422
 
 
-@patch('services.auth_service.AuthService.sign_in', new_callable=AsyncMock)
+@patch("services.auth_service.AuthService.sign_in", new_callable=AsyncMock)
 def test_login_valid_credentials(mock_sign_in, client):
     """Valid login should return tokens."""
     mock_sign_in.return_value = {
         "access_token": "valid_token",
         "refresh_token": "valid_refresh",
         "expires_in": 3600,
-        "user": {"id": "user123", "email": "test@test.com"}
+        "user": {"id": "user123", "email": "test@test.com"},
     }
-    response = client.post("/api/auth/login", json={
-        "email": "test@test.com",
-        "password": "validpass123"
-    })
+    response = client.post("/api/auth/login", json={"email": "test@test.com", "password": "validpass123"})
     assert response.status_code in (200, 500)  # 500 if Supabase client not configured
 
 
 # ---------------------------------------------------------------------------
 # POST /api/auth/logout
 # ---------------------------------------------------------------------------
+
 
 def test_logout_always_succeeds(client):
     """Logout should always return success (even without valid token)."""
@@ -116,6 +112,7 @@ def test_logout_always_succeeds(client):
 # POST /api/auth/refresh
 # ---------------------------------------------------------------------------
 
+
 def test_refresh_requires_token(client):
     """Refresh endpoint should require a refresh token."""
     response = client.post("/api/auth/refresh", json={})
@@ -126,6 +123,7 @@ def test_refresh_requires_token(client):
 # POST /api/auth/forgot-password
 # ---------------------------------------------------------------------------
 
+
 def test_forgot_password_requires_email(client):
     """Forgot password should require an email."""
     response = client.post("/api/auth/forgot-password", json={})
@@ -134,9 +132,7 @@ def test_forgot_password_requires_email(client):
 
 def test_forgot_password_valid_email(client):
     """Forgot password with valid email format should return 200."""
-    response = client.post("/api/auth/forgot-password", json={
-        "email": "test@example.com"
-    })
+    response = client.post("/api/auth/forgot-password", json={"email": "test@example.com"})
     # Should always return 200 (don't reveal if email exists)
     assert response.status_code == 200
 
@@ -144,6 +140,7 @@ def test_forgot_password_valid_email(client):
 # ---------------------------------------------------------------------------
 # Cross-cutting auth tests
 # ---------------------------------------------------------------------------
+
 
 def test_protected_route_without_token_in_dev(client):
     """In dev/test mode, unauthenticated requests should still work (dev_user bypass)."""

@@ -13,9 +13,11 @@ from typing import Any
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 
@@ -84,12 +86,13 @@ class RAGService:
         """Use Gemini to expand query with cricket domain context."""
         if not self.gemini_api_key:
             return query
-            
+
         try:
             import google.generativeai as genai
+
             genai.configure(api_key=self.gemini_api_key)
             model = genai.GenerativeModel("gemini-2.5-flash")
-            
+
             prompt = f"Expand the following fantasy sports query into 2-3 targeted search keywords or short sentences focusing on recent form, pitch behavior, and match-ups: '{query}'"
             response = await asyncio.to_thread(model.generate_content, prompt)
             return response.text if response.text else query
@@ -105,6 +108,7 @@ class RAGService:
             return None
         try:
             import google.generativeai as genai
+
             genai.configure(api_key=self.gemini_api_key)
             result = await asyncio.to_thread(
                 genai.embed_content,
@@ -122,12 +126,14 @@ class RAGService:
         if not self.pinecone_api_key:
             return []
         try:
-            from pinecone import Pinecone
             import os
+
+            from pinecone import Pinecone
+
             pc = Pinecone(api_key=self.pinecone_api_key)
             index_name = os.getenv("PINECONE_INDEX_NAME", "teamgenie-rag")
             index = pc.Index(index_name)
-            
+
             # Use Gemini to generate query embedding
             query_embedding = await self._get_embedding(query)
             if query_embedding:
@@ -137,11 +143,13 @@ class RAGService:
                 docs = []
                 for match in results.get("matches", []):
                     meta = match.get("metadata", {})
-                    docs.append({
-                        "content": meta.get("text", meta.get("name", "")),
-                        "score": match.get("score", 0),
-                        "source": f"pinecone_{namespace}",
-                    })
+                    docs.append(
+                        {
+                            "content": meta.get("text", meta.get("name", "")),
+                            "score": match.get("score", 0),
+                            "source": f"pinecone_{namespace}",
+                        }
+                    )
                 return docs
         except Exception as e:
             logger.warning("rag.pinecone_query_failed", namespace=namespace, error=str(e))
@@ -162,12 +170,13 @@ class RAGService:
             return docs
         try:
             from services.scraper_service import _ddg_search
+
             results = await _ddg_search(f"cricket match history {query}", max_results=k)
             if results and len(results) > 20:
                 return [{"content": results[:500], "score": 0.85, "source": "ddg_match_history"}]
         except Exception as e:
             logger.warning("rag.match_history_search_failed", error=str(e))
-        
+
         # Audit Fix #07: Return empty when no real data available — no fabricated stubs
         return []
 
@@ -178,12 +187,13 @@ class RAGService:
             return docs
         try:
             from services.scraper_service import _ddg_search
+
             results = await _ddg_search(f"cricket venue pitch report {query}", max_results=k)
             if results and len(results) > 20:
                 return [{"content": results[:500], "score": 0.8, "source": "ddg_venue_data"}]
         except Exception as e:
             logger.warning("rag.venue_search_failed", error=str(e))
-        
+
         # Audit Fix #07: Return empty when no real data available — no fabricated stubs
         return []
 
@@ -196,6 +206,7 @@ class RAGService:
         if self.tavily_api_key:
             try:
                 import httpx
+
                 async with httpx.AsyncClient(timeout=5.0) as client:
                     resp = await client.post(
                         "https://api.tavily.com/search",
@@ -210,25 +221,28 @@ class RAGService:
                         data = resp.json()
                         docs = []
                         for result in data.get("results", []):
-                            docs.append({
-                                "content": result.get("content", "")[:300],
-                                "score": result.get("score", 0.7),
-                                "source": f"tavily:{result.get('url', '')}",
-                            })
+                            docs.append(
+                                {
+                                    "content": result.get("content", "")[:300],
+                                    "score": result.get("score", 0.7),
+                                    "source": f"tavily:{result.get('url', '')}",
+                                }
+                            )
                         if docs:
                             return docs
             except Exception as e:
                 logger.warning("rag.tavily_query_failed", error=str(e))
-        
+
         # DDG fallback for news
         try:
             from services.scraper_service import _ddg_search
+
             results = await _ddg_search(f"cricket news {query} today", max_results=k)
             if results and len(results) > 20:
                 return [{"content": results[:300], "score": 0.7, "source": "ddg_news"}]
         except Exception:
             pass
-        
+
         # Audit Fix #07: Return empty when no real news available — no fabricated stubs
         return []
 
@@ -239,17 +253,20 @@ class RAGService:
         try:
             if self.cohere_api_key:
                 import cohere
+
                 co = cohere.Client(self.cohere_api_key)
                 # Ensure docs have text for Cohere
                 doc_texts = [d.get("content", "") for d in docs]
                 # Fallback to sorting if texts are empty
                 if all(not t for t in doc_texts):
                     return sorted(docs, key=lambda d: d.get("score", 0), reverse=True)
-                    
-                response = await asyncio.to_thread(co.rerank, model="rerank-english-v2.0", query=query, documents=doc_texts, top_n=len(docs))
-                
+
+                response = await asyncio.to_thread(
+                    co.rerank, model="rerank-english-v2.0", query=query, documents=doc_texts, top_n=len(docs)
+                )
+
                 ranked_docs = []
-                for idx, result in enumerate(response.results):
+                for _, result in enumerate(response.results):
                     original_doc = docs[result.index]
                     original_doc["cohere_score"] = result.relevance_score
                     ranked_docs.append(original_doc)
@@ -267,20 +284,21 @@ class RAGService:
         context_str = "\n".join(
             f"- {d.get('content', '')[:300]}"  # Audit Fix: truncate each doc to 300 chars
             for d in context
-            if d.get('content', '')  # Skip empty entries
+            if d.get("content", "")  # Skip empty entries
         )
-        
+
         if not self.gemini_api_key:
-             return f"DEMO ANALYSIS:\nBased on: \n{context_str}\n\nConclusion: Highly valuable fantasy asset."
-             
+            return f"DEMO ANALYSIS:\nBased on: \n{context_str}\n\nConclusion: Highly valuable fantasy asset."
+
         try:
             import google.generativeai as genai
+
             genai.configure(api_key=self.gemini_api_key)
             model = genai.GenerativeModel("gemini-2.0-flash")
-            
+
             prompt = f"You are TeamGenie's expert fantasy sports analyst. Based on the following retrieved context, concisely answer the user's query.\n\nContext:\n{context_str}\n\nQuery: {question}\n\nProvide a bold, insightful, and data-driven summary in exactly one paragraph. Do not invent stats outside the context."
             response = await asyncio.to_thread(model.generate_content, prompt)
             return response.text if response.text else "Failed to generate analysis."
         except Exception as e:
             logger.warning("rag.generate_failed", error=str(e))
-            return f"Error during generation: {str(e)}"
+            return f"Error during generation: {e!s}"

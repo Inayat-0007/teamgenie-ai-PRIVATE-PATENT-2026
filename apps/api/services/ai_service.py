@@ -14,18 +14,19 @@ UPGRADES APPLIED:
 from __future__ import annotations
 
 import asyncio
-import os
 import re
-from typing import Any, Optional
+from typing import Any
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
-from core.settings import settings, AppMode
+from core.settings import AppMode, settings
 
 # Configuration
 _TEAM_SIZE = 11
@@ -101,7 +102,7 @@ def _validate_player_data(players: list[dict]) -> list[dict]:
 
         # Sanitize — ensure consistent types and REJECT NON-PLAYER NAMES
         name_lower = p.get("name", "").lower()
-        non_player_keywords = {"stadium", "team", "vs", "versus", "stadium", "ground", "pitch", "today", "report"}
+        non_player_keywords = {"stadium", "team", "vs", "versus", "ground", "pitch", "today", "report"}
         if any(kw in name_lower for kw in non_player_keywords):
             logger.warning("player.rejected_as_non_human", name=p.get("name"))
             continue
@@ -169,6 +170,7 @@ def _validate_team_output(team: dict, budget: float) -> list[str]:
 
     # 7. Max 7 from same team (fantasy platform rule)
     from collections import Counter
+
     team_counts = Counter(p.get("team", "?") for p in players if "team" in p)
     for team_name, count in team_counts.items():
         if count > 7:
@@ -181,9 +183,9 @@ def _validate_team_output(team: dict, budget: float) -> list[str]:
     if roles.get("bowler", 0) < 3:
         warnings.append(f"Too few bowlers: {roles.get('bowler', 0)} (min 3)")
     if roles.get("wicket_keeper", 0) < 1:
-        warnings.append(f"No wicket keeper selected (min 1)")
+        warnings.append("No wicket keeper selected (min 1)")
     if roles.get("all_rounder", 0) < 1:
-        warnings.append(f"No all rounder selected (min 1)")
+        warnings.append("No all rounder selected (min 1)")
 
     return warnings
 
@@ -192,10 +194,10 @@ async def generate_team_with_agents(
     match_id: str,
     budget: float = _DEFAULT_BUDGET,
     risk_level: str = "balanced",
-    preferences: Optional[dict] = None,
+    preferences: dict | None = None,
     jit_context: str = "",
-    toss_winner: Optional[str] = None,
-    toss_decision: Optional[str] = None,
+    toss_winner: str | None = None,
+    toss_decision: str | None = None,
     team_a: str = "",
     team_b: str = "",
 ) -> dict:
@@ -239,8 +241,7 @@ async def generate_team_with_agents(
 
     if len(players) < _TEAM_SIZE:
         raise ValueError(
-            f"After validation, only {len(players)} valid players remain "
-            f"(need {_TEAM_SIZE}) for match {match_id}"
+            f"After validation, only {len(players)} valid players remain (need {_TEAM_SIZE}) for match {match_id}"
         )
 
     # Phase 0.5: Enrich with statistical projections (Upgrade #8)
@@ -270,7 +271,7 @@ async def generate_team_with_agents(
             ),
             timeout=_AGENT_TIMEOUT_SECONDS,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.error("generation.timeout", match_id=match_id, timeout_s=_AGENT_TIMEOUT_SECONDS)
         raise ValueError(
             f"Team generation timed out after {_AGENT_TIMEOUT_SECONDS}s. "
@@ -310,7 +311,7 @@ async def generate_team_with_agents(
             _run_risk_manager(budget_result, differential_result, risk_level),
             timeout=_AGENT_TIMEOUT_SECONDS,
         )
-    except asyncio.TimeoutError:
+    except TimeoutError:
         logger.warning("agent.risk_manager_timeout", match_id=match_id)
         players_list = budget_result.get("players", [])
         risk_result = {
@@ -347,15 +348,9 @@ async def generate_team_with_agents(
     return {
         "team": team,
         "reasoning": {
-            "budget_agent": budget_result.get(
-                "reasoning", "Optimized within budget constraints."
-            ),
-            "differential_agent": differential_result.get(
-                "reasoning", "Identified low-ownership opportunities."
-            ),
-            "risk_agent": risk_result.get(
-                "reasoning", f"Balanced for {risk_level} risk profile."
-            ),
+            "budget_agent": budget_result.get("reasoning", "Optimized within budget constraints."),
+            "differential_agent": differential_result.get("reasoning", "Identified low-ownership opportunities."),
+            "risk_agent": risk_result.get("reasoning", f"Balanced for {risk_level} risk profile."),
         },
         "jit_intelligence": jit_context[:500] if jit_context else None,
     }
@@ -400,6 +395,7 @@ async def _enrich_with_projections(players: list[dict]) -> list[dict]:
     """Upgrade #8: Statistical enrichment with graceful fallback."""
     try:
         from services.projection_service import projection_service
+
         enriched = await projection_service.compute_projections(players)
 
         # Verify enrichment preserved all players and added required fields
@@ -431,6 +427,7 @@ async def _fetch_players(match_id: str, team_a: str = "", team_b: str = "") -> l
     if settings.APP_MODE in [AppMode.PRODUCTION, AppMode.HYBRID]:
         try:
             from db.connection import execute_query
+
             rows = await execute_query(
                 "SELECT id, name, role, price, predicted_points, ownership_pct, team, form_score FROM players WHERE match_id = ? AND status = 'active'",
                 (match_id,),
@@ -446,6 +443,7 @@ async def _fetch_players(match_id: str, team_a: str = "", team_b: str = "") -> l
     # 2. MASTER FIX: Attempt Real-Time JIT Web Scraping (DuckDuckGo Roster Extraction)
     try:
         from services.scraper_service import scraper_service
+
         logger.info("players.attempt_jit_scrape", match_id=match_id)
         scraped_players = await scraper_service.scrape_playing_xi(match_id, team_a=team_a, team_b=team_b)
         if scraped_players:
@@ -462,22 +460,112 @@ async def _fetch_players(match_id: str, team_a: str = "", team_b: str = "") -> l
 def _get_sample_players() -> list[dict[str, Any]]:
     """Static sample data for DEMO/HYBRID fallback. Clearly marked as non-production."""
     return [
-        {"id": "virat_kohli", "name": "Virat Kohli", "role": "batsman", "price": 10.5, "predicted_points": 85.3, "ownership_pct": 67.3, "team": "RCB"},
-        {"id": "rohit_sharma", "name": "Rohit Sharma", "role": "batsman", "price": 10.0, "predicted_points": 72.1, "ownership_pct": 71.5, "team": "MI"},
-        {"id": "jasprit_bumrah", "name": "Jasprit Bumrah", "role": "bowler", "price": 9.5, "predicted_points": 68.4, "ownership_pct": 55.2, "team": "MI"},
-        {"id": "ravindra_jadeja", "name": "Ravindra Jadeja", "role": "all_rounder", "price": 9.0, "predicted_points": 65.0, "ownership_pct": 42.1, "team": "CSK"},
-        {"id": "rishabh_pant", "name": "Rishabh Pant", "role": "wicket_keeper", "price": 9.0, "predicted_points": 60.5, "ownership_pct": 38.7, "team": "DC"},
-        {"id": "hardik_pandya", "name": "Hardik Pandya", "role": "all_rounder", "price": 9.0, "predicted_points": 62.0, "ownership_pct": 45.3, "team": "MI"},
-        {"id": "suryakumar_yadav", "name": "Suryakumar Yadav", "role": "batsman", "price": 9.0, "predicted_points": 70.2, "ownership_pct": 50.1, "team": "MI"},
-        {"id": "kuldeep_yadav", "name": "Kuldeep Yadav", "role": "bowler", "price": 8.5, "predicted_points": 55.3, "ownership_pct": 28.5, "team": "DC"},
-        {"id": "mohammed_siraj", "name": "Mohammed Siraj", "role": "bowler", "price": 8.0, "predicted_points": 50.1, "ownership_pct": 22.3, "team": "RCB"},
-        {"id": "axar_patel", "name": "Axar Patel", "role": "all_rounder", "price": 8.0, "predicted_points": 48.5, "ownership_pct": 18.2, "team": "DC"},
-        {"id": "shubman_gill", "name": "Shubman Gill", "role": "batsman", "price": 9.5, "predicted_points": 58.0, "ownership_pct": 35.6, "team": "GT"},
+        {
+            "id": "virat_kohli",
+            "name": "Virat Kohli",
+            "role": "batsman",
+            "price": 10.5,
+            "predicted_points": 85.3,
+            "ownership_pct": 67.3,
+            "team": "RCB",
+        },
+        {
+            "id": "rohit_sharma",
+            "name": "Rohit Sharma",
+            "role": "batsman",
+            "price": 10.0,
+            "predicted_points": 72.1,
+            "ownership_pct": 71.5,
+            "team": "MI",
+        },
+        {
+            "id": "jasprit_bumrah",
+            "name": "Jasprit Bumrah",
+            "role": "bowler",
+            "price": 9.5,
+            "predicted_points": 68.4,
+            "ownership_pct": 55.2,
+            "team": "MI",
+        },
+        {
+            "id": "ravindra_jadeja",
+            "name": "Ravindra Jadeja",
+            "role": "all_rounder",
+            "price": 9.0,
+            "predicted_points": 65.0,
+            "ownership_pct": 42.1,
+            "team": "CSK",
+        },
+        {
+            "id": "rishabh_pant",
+            "name": "Rishabh Pant",
+            "role": "wicket_keeper",
+            "price": 9.0,
+            "predicted_points": 60.5,
+            "ownership_pct": 38.7,
+            "team": "DC",
+        },
+        {
+            "id": "hardik_pandya",
+            "name": "Hardik Pandya",
+            "role": "all_rounder",
+            "price": 9.0,
+            "predicted_points": 62.0,
+            "ownership_pct": 45.3,
+            "team": "MI",
+        },
+        {
+            "id": "suryakumar_yadav",
+            "name": "Suryakumar Yadav",
+            "role": "batsman",
+            "price": 9.0,
+            "predicted_points": 70.2,
+            "ownership_pct": 50.1,
+            "team": "MI",
+        },
+        {
+            "id": "kuldeep_yadav",
+            "name": "Kuldeep Yadav",
+            "role": "bowler",
+            "price": 8.5,
+            "predicted_points": 55.3,
+            "ownership_pct": 28.5,
+            "team": "DC",
+        },
+        {
+            "id": "mohammed_siraj",
+            "name": "Mohammed Siraj",
+            "role": "bowler",
+            "price": 8.0,
+            "predicted_points": 50.1,
+            "ownership_pct": 22.3,
+            "team": "RCB",
+        },
+        {
+            "id": "axar_patel",
+            "name": "Axar Patel",
+            "role": "all_rounder",
+            "price": 8.0,
+            "predicted_points": 48.5,
+            "ownership_pct": 18.2,
+            "team": "DC",
+        },
+        {
+            "id": "shubman_gill",
+            "name": "Shubman Gill",
+            "role": "batsman",
+            "price": 9.5,
+            "predicted_points": 58.0,
+            "ownership_pct": 35.6,
+            "team": "GT",
+        },
     ]
 
 
 async def _run_budget_optimizer(
-    players: list[dict], budget: float, preferences: Optional[dict] = None,
+    players: list[dict],
+    budget: float,
+    preferences: dict | None = None,
 ) -> dict:
     """
     Agent 1: Maximize points within budget.
@@ -505,7 +593,8 @@ async def _run_budget_optimizer(
     # to avoid blocking the asyncio event loop (which freezes ALL concurrent requests).
     solver_used = "greedy-heuristic"
     try:
-        from ortools.linear_solver import pywraplp
+        from ortools.linear_solver import pywraplp  # noqa: F401
+
         selected, total_cost, total_points = await asyncio.to_thread(_solve_ilp, working_players, budget)
         solver_used = "or-tools-ilp"
     except ImportError:
@@ -561,12 +650,10 @@ def _solve_ilp(players: list[dict], budget: float) -> tuple:
     if not solver:
         raise RuntimeError("OR-Tools SCIP solver unavailable")
 
-    x = {p["id"]: solver.BoolVar(f'x_{p["id"]}') for p in players}
+    x = {p["id"]: solver.BoolVar(f"x_{p['id']}") for p in players}
 
     # Maximize predicted points
-    solver.Maximize(
-        sum(x[p["id"]] * p.get("expected_points", p["predicted_points"]) for p in players)
-    )
+    solver.Maximize(sum(x[p["id"]] * p.get("expected_points", p["predicted_points"]) for p in players))
 
     # Budget constraint
     solver.Add(sum(x[p["id"]] * p["price"] for p in players) <= budget)
@@ -607,11 +694,11 @@ def _solve_greedy(players: list[dict], budget: float) -> tuple:
     for player in sorted_players:
         if len(selected) >= _TEAM_SIZE:
             break
-            
+
         team_name = player.get("team", "UNKNOWN")
         if team_counts.get(team_name, 0) >= 7:
             continue
-            
+
         if total_cost + player["price"] <= budget:
             selected.append(player)
             total_cost += player["price"]
@@ -645,9 +732,7 @@ async def _run_differential_expert(players: list[dict], match_id: str, jit_conte
     }
 
 
-async def _run_risk_manager(
-    budget_result: dict, differential_result: dict, risk_level: str
-) -> dict:
+async def _run_risk_manager(budget_result: dict, differential_result: dict, risk_level: str) -> dict:
     """Agent 3: Balance risk/reward based on user preference."""
     risk_scores = {"safe": 0.3, "balanced": 0.5, "aggressive": 0.8}
     players = budget_result.get("players", [])
@@ -693,9 +778,7 @@ async def _run_risk_manager(
     }
 
 
-def _build_consensus_team(
-    budget_result: dict, differential_result: dict, risk_result: dict
-) -> dict:
+def _build_consensus_team(budget_result: dict, differential_result: dict, risk_result: dict) -> dict:
     """Build final team from agent outputs."""
     players = budget_result.get("players", [])[:_TEAM_SIZE]
 
@@ -714,16 +797,13 @@ def _build_consensus_team(
             }
             for p in players
         ],
-        "captain": risk_result.get(
-            "captain", players[0]["id"] if players else ""
-        ),
-        "vice_captain": risk_result.get(
-            "vice_captain", players[1]["id"] if len(players) > 1 else ""
-        ),
+        "captain": risk_result.get("captain", players[0]["id"] if players else ""),
+        "vice_captain": risk_result.get("vice_captain", players[1]["id"] if len(players) > 1 else ""),
         "total_cost": budget_result.get("total_cost", 0),
         "predicted_total": budget_result.get("total_points", 0),
         "risk_score": risk_result.get("risk_score", 0.5),
     }
+
 
 # --- Public Aliases (Backward Compatibility) ---
 generate_team = generate_team_with_agents

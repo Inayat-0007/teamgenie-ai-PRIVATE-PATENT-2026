@@ -17,16 +17,17 @@ import os
 import re
 import time
 from collections import defaultdict
-from typing import Dict, Tuple
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
-from fastapi import Request, HTTPException
+from fastapi import HTTPException, Request
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -36,11 +37,13 @@ from fastapi import Request, HTTPException
 _MAX_BODY_BYTES = int(os.getenv("FIREWALL_MAX_BODY_BYTES", str(1 * 1024 * 1024)))
 
 # Allowed content types for mutating methods
-_ALLOWED_CONTENT_TYPES = frozenset({
-    "application/json",
-    "application/x-www-form-urlencoded",
-    "multipart/form-data",
-})
+_ALLOWED_CONTENT_TYPES = frozenset(
+    {
+        "application/json",
+        "application/x-www-form-urlencoded",
+        "multipart/form-data",
+    }
+)
 
 # Pre-compiled regex for common attack signatures (case-insensitive)
 _ATTACK_PATTERNS: list[re.Pattern] = [
@@ -87,30 +90,28 @@ _EXEMPT_PATHS: frozenset[str] = frozenset({"/health", "/docs", "/redoc", "/opena
 # ---------------------------------------------------------------------------
 # In-memory per-IP violation tracker (complements Redis rate limiter)
 # ---------------------------------------------------------------------------
-_ip_violations: Dict[str, list] = defaultdict(list)
+_ip_violations: dict[str, list] = defaultdict(list)
 _IP_BAN_THRESHOLD = int(os.getenv("FIREWALL_BAN_THRESHOLD", "5"))  # violations before temp ban
 _IP_BAN_WINDOW_SECONDS = 600  # 10 minute window
 
 
 def _get_client_ip(request: Request) -> str:
     """Extract client IP with X-Forwarded-For validation.
-    
+
     Audit Fix: Previously blindly trusted X-Forwarded-For from any source.
     Now only trusts the header when the direct connection is from a known proxy.
     Attackers could set X-Forwarded-For: 127.0.0.1 to bypass IP bans.
     """
     # Only trust X-Forwarded-For if the direct connection is from a trusted proxy
-    trusted_proxies = set(
-        os.getenv("TRUSTED_PROXIES", "127.0.0.1,10.0.0.0/8").split(",")
-    )
+    trusted_proxies = set(os.getenv("TRUSTED_PROXIES", "127.0.0.1,10.0.0.0/8").split(","))
     direct_ip = request.client.host if request.client else "unknown"
-    
+
     # If direct connection is from a known proxy, trust X-Forwarded-For
     if direct_ip in trusted_proxies:
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
             return forwarded.split(",")[0].strip()
-    
+
     return direct_ip
 
 
@@ -180,19 +181,18 @@ async def ai_firewall_check(request: Request, call_next):
         )
 
     # Layer 1: Content-Type validation for mutating methods
-    if request.method in {"POST", "PUT", "PATCH"}:
-        if not _validate_content_type(request):
-            violation_count = _record_violation(client_ip)
-            logger.warning(
-                "firewall.invalid_content_type",
-                ip=client_ip,
-                content_type=request.headers.get("content-type", "missing"),
-                violation=violation_count,
-            )
-            raise HTTPException(
-                status_code=415,
-                detail="Unsupported Media Type: Expected application/json",
-            )
+    if request.method in {"POST", "PUT", "PATCH"} and not _validate_content_type(request):
+        violation_count = _record_violation(client_ip)
+        logger.warning(
+            "firewall.invalid_content_type",
+            ip=client_ip,
+            content_type=request.headers.get("content-type", "missing"),
+            violation=violation_count,
+        )
+        raise HTTPException(
+            status_code=415,
+            detail="Unsupported Media Type: Expected application/json",
+        )
 
     # Layer 2: Check headers for injection
     if _check_headers(request):

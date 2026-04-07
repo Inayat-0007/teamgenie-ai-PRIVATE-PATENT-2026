@@ -18,13 +18,15 @@ from __future__ import annotations
 import asyncio
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 try:
@@ -36,11 +38,11 @@ except ImportError:
 # Global Match-Level Cache (in-memory, per-process)
 # ---------------------------------------------------------------------------
 
-_match_cache: Dict[str, Dict[str, Any]] = {}
+_match_cache: dict[str, dict[str, Any]] = {}
 _CACHE_TTL = {
-    "pitch_weather": 6 * 3600,   # 6 hours
-    "injuries": 3600,             # 1 hour
-    "matchups": 24 * 3600,        # 24 hours
+    "pitch_weather": 6 * 3600,  # 6 hours
+    "injuries": 3600,  # 1 hour
+    "matchups": 24 * 3600,  # 24 hours
 }
 
 
@@ -48,7 +50,7 @@ def _cache_key(match_id: str, category: str) -> str:
     return f"{match_id}::{category}"
 
 
-def _get_cached(match_id: str, category: str) -> Optional[str]:
+def _get_cached(match_id: str, category: str) -> str | None:
     key = _cache_key(match_id, category)
     entry = _match_cache.get(key)
     if entry and (time.time() - entry["ts"]) < _CACHE_TTL.get(category, 3600):
@@ -85,13 +87,13 @@ _HTML_TAG_RE = re.compile(r"<[^>]+>")
 
 def _clean_snippets(raw_text: str) -> str:
     """Remove HTML, clickbait, prompt injections, and normalize whitespace.
-    
+
     Security: Scraped web content is sanitized before injection into LLM context
     to prevent prompt injection attacks via malicious web pages.
     """
     # Step 1: Strip all HTML tags
     raw_text = _HTML_TAG_RE.sub(" ", raw_text)
-    
+
     lines = raw_text.split(".")
     cleaned = []
     for line in lines:
@@ -113,6 +115,7 @@ def _clean_snippets(raw_text: str) -> str:
 # DuckDuckGo JIT Search (Zero API Keys)
 # ---------------------------------------------------------------------------
 
+
 async def _ddg_search(query: str, max_results: int = 3) -> str:
     """Execute a DuckDuckGo text search and return cleaned snippets."""
     try:
@@ -120,9 +123,7 @@ async def _ddg_search(query: str, max_results: int = 3) -> str:
             from ddgs import DDGS
         except ImportError:
             from duckduckgo_search import DDGS
-        results = await asyncio.to_thread(
-            lambda: list(DDGS().text(query, max_results=max_results))
-        )
+        results = await asyncio.to_thread(lambda: list(DDGS().text(query, max_results=max_results)))
         raw = " ".join(r.get("body", "") for r in results)
         return _clean_snippets(raw)
     except Exception as exc:
@@ -135,7 +136,7 @@ async def _ddg_search(query: str, max_results: int = 3) -> str:
 # ---------------------------------------------------------------------------
 
 # Stadium coordinates for major IPL venues
-_VENUE_COORDS: Dict[str, tuple] = {
+_VENUE_COORDS: dict[str, tuple] = {
     "wankhede": (18.939, 72.826),
     "chepauk": (13.063, 80.279),
     "chinnaswamy": (12.978, 77.600),
@@ -172,10 +173,7 @@ async def _fetch_weather(venue_key: str = "default") -> str:
             precip = data.get("precipitation", 0)
             dew = "HEAVY DEW EXPECTED" if int(str(humidity).replace("N/A", "0")) > 75 else "Low dew factor"
             rain = "RAIN LIKELY" if float(str(precip).replace("N/A", "0")) > 0.5 else "No rain expected"
-            return (
-                f"Stadium Weather: {temp}°C, Humidity: {humidity}%, "
-                f"Wind: {wind} km/h. {dew}. {rain}."
-            )
+            return f"Stadium Weather: {temp}°C, Humidity: {humidity}%, Wind: {wind} km/h. {dew}. {rain}."
     except Exception as exc:
         logger.warning("weather.failed", error=str(exc))
         return "Weather data temporarily unavailable."
@@ -185,10 +183,11 @@ async def _fetch_weather(venue_key: str = "default") -> str:
 # Public API: get_match_context()
 # ---------------------------------------------------------------------------
 
+
 class ScraperService:
     """JIT Intelligence Engine — zero-cost, zero-hallucination data injection."""
 
-    async def scrape_playing_xi(self, match_id: str, team_a: str = "", team_b: str = "") -> List[Dict[str, Any]]:
+    async def scrape_playing_xi(self, match_id: str, team_a: str = "", team_b: str = "") -> list[dict[str, Any]]:
         """
         Master-Level JIT Roster Scraper.
         Domain-restricted search + Structural entity filtering.
@@ -197,44 +196,93 @@ class ScraperService:
         match_label = f"{team_a} vs {team_b}".strip() or match_id
         # Restricted to trusted cricket domains to avoid noise
         q = f'(site:espncricinfo.com OR site:cricbuzz.com OR site:sportskeeda.com) "{match_label}" probable playing XI today'
-        
+
         logger.info("jit.roster_search", match_id=match_id, query=q)
         raw_intel = await _ddg_search(q, max_results=10)
-        
+
         if not raw_intel:
             return []
 
         import re
+
         # Human Name Pattern: 2-3 capitalized words, no numbers, no dots (except initials)
         potential_names = re.findall(r"\b[A-Z][a-z]+(?:\s[A-Z][a-z]+){1,2}\b", raw_intel)
-        
+
         KNOWN_TEAMS = {
-            "Chennai", "Mumbai", "Bangalore", "Bengaluru", "Kolkata", "Delhi", "Rajasthan",
-            "Punjab", "Hyderabad", "Gujarat", "Lucknow", "Super", "Kings", "Indians",
-            "Royals", "Giants", "Titans", "Capitals", "Riders", "Knight", "Sunrisers"
+            "Chennai",
+            "Mumbai",
+            "Bangalore",
+            "Bengaluru",
+            "Kolkata",
+            "Delhi",
+            "Rajasthan",
+            "Punjab",
+            "Hyderabad",
+            "Gujarat",
+            "Lucknow",
+            "Super",
+            "Kings",
+            "Indians",
+            "Royals",
+            "Giants",
+            "Titans",
+            "Capitals",
+            "Riders",
+            "Knight",
+            "Sunrisers",
         }
-        
+
         NON_PLAYER_WORDS = {
-            "Match", "Stadium", "India", "Live", "Daily", "Today", "Latest", "News", 
-            "Probable", "Toss", "Report", "Pitch", "Team", "Fantasy", "Prediction", 
-            "Versus", "Vs", "Result", "Venues", "IPL", "Cricketers", "Cricket", 
-            "Ukraine", "Russia", "Peace", "Deal", "Breaking", "Analysis", "Players",
-            "Politics", "Billion", "Deal", "Crisis", "Conflict", "World", "Ranking"
+            "Match",
+            "Stadium",
+            "India",
+            "Live",
+            "Daily",
+            "Today",
+            "Latest",
+            "News",
+            "Probable",
+            "Toss",
+            "Report",
+            "Pitch",
+            "Team",
+            "Fantasy",
+            "Prediction",
+            "Versus",
+            "Vs",
+            "Result",
+            "Venues",
+            "IPL",
+            "Cricketers",
+            "Cricket",
+            "Ukraine",
+            "Russia",
+            "Peace",
+            "Deal",
+            "Breaking",
+            "Analysis",
+            "Players",
+            "Politics",
+            "Billion",
+            "Crisis",
+            "Conflict",
+            "World",
+            "Ranking",
         }
-        
+
         unique_names = []
         seen = set()
         for n in potential_names:
             words = set(re.findall(r"\w+", n))
-            
+
             # 1. Reject if any word is a team name or stopword
             if words.intersection(KNOWN_TEAMS) or words.intersection(NON_PLAYER_WORDS):
                 continue
-            
+
             # 2. Reject if too long or looks like a title
             if len(n) > 25 or len(n.split()) > 3:
                 continue
-                
+
             # 3. Structural validation: Player names don't usually start with "The" or "A"
             if n.startswith(("The ", "A ", "In ", "At ")):
                 continue
@@ -247,7 +295,7 @@ class ScraperService:
         if len(unique_names) < 11:
             logger.info("jit.padding_roster", found=len(unique_names))
             # Map team abbreviations to franchise players
-            _TEAM_BACKUP_STARS: Dict[str, List[str]] = {
+            _TEAM_BACKUP_STARS: dict[str, list[str]] = {
                 "CSK": ["Ruturaj Gaikwad", "Ravindra Jadeja", "Devon Conway", "Matheesha Pathirana", "Moeen Ali"],
                 "MI": ["Rohit Sharma", "Jasprit Bumrah", "Suryakumar Yadav", "Hardik Pandya", "Tim David"],
                 "RCB": ["Virat Kohli", "Mohammed Siraj", "Glenn Maxwell", "Faf Du Plessis", "Dinesh Karthik"],
@@ -270,12 +318,13 @@ class ScraperService:
                         seen.add(s.lower())
 
         names = unique_names[:22]
-        
+
         if not names:
             return []
 
         # Cross-reference against known player pool for REAL stats
         from workers.harvester import _get_player_pool
+
         known_pool = {p["name"].lower(): p for p in _get_player_pool()}
 
         players = []
@@ -284,36 +333,40 @@ class ScraperService:
         for i, name in enumerate(names):
             p_team = teams[0] if i < len(names) / 2 else teams[1]
             known = known_pool.get(name.lower())
-            
+
             if known:
                 # Use REAL stats from curated pool
-                players.append({
-                    "id": known["id"],
-                    "name": known["name"],
-                    "role": known["role"],
-                    "price": known["price"],
-                    "predicted_points": known["predicted_points"],
-                    "ownership_pct": known["ownership_pct"],
-                    "team": known.get("team", p_team),
-                    "form_score": known.get("form_score", 50),
-                    "status": "active",
-                    "data_source": "curated_pool",
-                })
+                players.append(
+                    {
+                        "id": known["id"],
+                        "name": known["name"],
+                        "role": known["role"],
+                        "price": known["price"],
+                        "predicted_points": known["predicted_points"],
+                        "ownership_pct": known["ownership_pct"],
+                        "team": known.get("team", p_team),
+                        "form_score": known.get("form_score", 50),
+                        "status": "active",
+                        "data_source": "curated_pool",
+                    }
+                )
             else:
                 # Unknown player: conservative defaults, clearly tagged
-                players.append({
-                    "id": name.lower().replace(" ", "_"),
-                    "name": name,
-                    "role": "batsman",  # Default, not round-robin
-                    "price": 7.0,       # Conservative base price
-                    "predicted_points": 35.0,  # Below-average baseline
-                    "ownership_pct": 5.0,      # Low ownership assumed
-                    "team": p_team,
-                    "form_score": 40,
-                    "status": "active",
-                    "data_source": "jit_estimated",
-                })
-            
+                players.append(
+                    {
+                        "id": name.lower().replace(" ", "_"),
+                        "name": name,
+                        "role": "batsman",  # Default, not round-robin
+                        "price": 7.0,  # Conservative base price
+                        "predicted_points": 35.0,  # Below-average baseline
+                        "ownership_pct": 5.0,  # Low ownership assumed
+                        "team": p_team,
+                        "form_score": 40,
+                        "status": "active",
+                        "data_source": "jit_estimated",
+                    }
+                )
+
         return players
 
     async def get_match_context(
@@ -339,9 +392,9 @@ class ScraperService:
         # Fast Speed Increase: Try reading from harvester's DB cache
         try:
             from db.connection import execute_query
+
             rows = await execute_query(
-                "SELECT intel_type, content, fetched_at FROM match_intelligence WHERE match_id = ?",
-                (match_id,)
+                "SELECT intel_type, content, fetched_at FROM match_intelligence WHERE match_id = ?", (match_id,)
             )
             if rows:
                 intel_dict = {row[0]: row[1] for row in rows}

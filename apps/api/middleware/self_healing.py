@@ -10,9 +10,11 @@ import traceback
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 from fastapi import Request
@@ -44,7 +46,7 @@ async def self_healing_middleware(request: Request, call_next):
             error_info["file"] = frame.filename
             error_info["line"] = frame.lineno
             try:
-                with open(frame.filename, "r", encoding="utf-8") as fh:
+                with open(frame.filename, encoding="utf-8") as fh:
                     lines = fh.readlines()
                     start = max(0, frame.lineno - _MAX_CONTEXT_LINES - 1)
                     end = min(len(lines), frame.lineno + _MAX_CONTEXT_LINES)

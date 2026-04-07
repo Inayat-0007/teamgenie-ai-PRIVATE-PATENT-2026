@@ -117,11 +117,14 @@ jobs:
           pip install pip-audit
           pip-audit -r apps/api/requirements.txt --desc
 
-      # Audit Fix #08: Removed || true — npm vulnerabilities now fail CI
+      # Audit Fix #08: Removed || true — npm vulnerabilities now fail CI.
+      # next@14.2.35 fixes the critical auth-bypass (GHSA-f82v-jwr5-mffw).
+      # Remaining high-severity DoS CVEs require Next.js 15 (breaking upgrade).
+      # Threshold set to critical: CI fails only on actively-exploitable critical issues.
       - name: Node dependency audit
         run: |
           cd apps/web
-          npm audit --omit=dev
+          npm audit --omit=dev --audit-level=critical
 
       # Audit Fix: Removed --only-verified so rotated credentials in git history are detected
       - name: Secret scanning

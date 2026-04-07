@@ -15,15 +15,17 @@ import asyncio
 import json
 import os
 import time
-import uuid
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from contextlib import suppress
+from datetime import UTC, datetime
+from typing import Any
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
     logging.basicConfig(level=logging.INFO)
 
@@ -37,7 +39,8 @@ except ImportError:
 # DuckDuckGo Search (zero cost, no API key)
 # ---------------------------------------------------------------------------
 
-async def _ddg_search(query: str, max_results: int = 5) -> List[Dict]:
+
+async def _ddg_search(query: str, max_results: int = 5) -> list[dict]:
     """Execute DuckDuckGo text search, return structured results.
     Uses the new `ddgs` package (v9+) with fallback to legacy `duckduckgo_search`.
     """
@@ -47,10 +50,8 @@ async def _ddg_search(query: str, max_results: int = 5) -> List[Dict]:
             from ddgs import DDGS
         except ImportError:
             from duckduckgo_search import DDGS
-        
-        results = await asyncio.to_thread(
-            lambda: list(DDGS().text(query, max_results=max_results))
-        )
+
+        results = await asyncio.to_thread(lambda: list(DDGS().text(query, max_results=max_results)))
         return [
             {
                 "title": r.get("title", ""),
@@ -83,7 +84,7 @@ _VENUE_COORDS = {
 }
 
 
-async def _fetch_weather(venue_key: str) -> Dict[str, Any]:
+async def _fetch_weather(venue_key: str) -> dict[str, Any]:
     """Fetch weather from Open-Meteo for a venue."""
     if not httpx:
         return {"error": "httpx not installed"}
@@ -115,7 +116,8 @@ async def _fetch_weather(venue_key: str) -> Dict[str, Any]:
 # IPL 2026 Match Schedule (seed data — augmented by scraper in full prod)
 # ---------------------------------------------------------------------------
 
-async def _get_ipl_2026_schedule() -> List[Dict]:
+
+async def _get_ipl_2026_schedule() -> list[dict]:
     """Return IPL match schedule. Uses DDG for current real-world context,
     but anchors dates to datetime.now() to ensure pipeline stability.
     """
@@ -128,23 +130,63 @@ async def _get_ipl_2026_schedule() -> List[Dict]:
 
     today = datetime.now()
     from datetime import timedelta
-    
+
     return [
-        {"id": "ipl_2026_13_rr_vs_mi", "title": "Rajasthan Royals vs Mumbai Indians", "league": "IPL 2026",
-         "team_a": "RR", "team_b": "MI", "venue": "sawai_mansingh",
-         "date": today.strftime("%Y-%m-%dT19:30:00+05:30"), "status": "upcoming", "prize": "₹15 Crores"},
-        {"id": "ipl_2026_14_dc_vs_gt", "title": "Delhi Capitals vs Gujarat Titans", "league": "IPL 2026",
-         "team_a": "DC", "team_b": "GT", "venue": "feroz_shah_kotla",
-         "date": (today + timedelta(days=1)).strftime("%Y-%m-%dT19:30:00+05:30"), "status": "upcoming", "prize": "₹10 Crores"},
-        {"id": "ipl_2026_15_kkr_vs_lsg", "title": "Kolkata Knight Riders vs Lucknow Super Giants", "league": "IPL 2026",
-         "team_a": "KKR", "team_b": "LSG", "venue": "eden_gardens",
-         "date": (today + timedelta(days=2)).strftime("%Y-%m-%dT19:30:00+05:30"), "status": "upcoming", "prize": "₹10 Crores"},
-        {"id": "ipl_2026_16_rr_vs_rcb", "title": "Rajasthan Royals vs Royal Challengers Bangalore", "league": "IPL 2026",
-         "team_a": "RR", "team_b": "RCB", "venue": "sawai_mansingh",
-         "date": (today + timedelta(days=3)).strftime("%Y-%m-%dT19:30:00+05:30"), "status": "upcoming", "prize": "₹12 Crores"},
-         {"id": "ipl_2026_17_pbks_vs_csk", "title": "Punjab Kings vs Chennai Super Kings", "league": "IPL 2026",
-         "team_a": "PBKS", "team_b": "CSK", "venue": "mohali",
-         "date": (today + timedelta(days=4)).strftime("%Y-%m-%dT19:30:00+05:30"), "status": "upcoming", "prize": "₹15 Crores"},
+        {
+            "id": "ipl_2026_13_rr_vs_mi",
+            "title": "Rajasthan Royals vs Mumbai Indians",
+            "league": "IPL 2026",
+            "team_a": "RR",
+            "team_b": "MI",
+            "venue": "sawai_mansingh",
+            "date": today.strftime("%Y-%m-%dT19:30:00+05:30"),
+            "status": "upcoming",
+            "prize": "₹15 Crores",
+        },
+        {
+            "id": "ipl_2026_14_dc_vs_gt",
+            "title": "Delhi Capitals vs Gujarat Titans",
+            "league": "IPL 2026",
+            "team_a": "DC",
+            "team_b": "GT",
+            "venue": "feroz_shah_kotla",
+            "date": (today + timedelta(days=1)).strftime("%Y-%m-%dT19:30:00+05:30"),
+            "status": "upcoming",
+            "prize": "₹10 Crores",
+        },
+        {
+            "id": "ipl_2026_15_kkr_vs_lsg",
+            "title": "Kolkata Knight Riders vs Lucknow Super Giants",
+            "league": "IPL 2026",
+            "team_a": "KKR",
+            "team_b": "LSG",
+            "venue": "eden_gardens",
+            "date": (today + timedelta(days=2)).strftime("%Y-%m-%dT19:30:00+05:30"),
+            "status": "upcoming",
+            "prize": "₹10 Crores",
+        },
+        {
+            "id": "ipl_2026_16_rr_vs_rcb",
+            "title": "Rajasthan Royals vs Royal Challengers Bangalore",
+            "league": "IPL 2026",
+            "team_a": "RR",
+            "team_b": "RCB",
+            "venue": "sawai_mansingh",
+            "date": (today + timedelta(days=3)).strftime("%Y-%m-%dT19:30:00+05:30"),
+            "status": "upcoming",
+            "prize": "₹12 Crores",
+        },
+        {
+            "id": "ipl_2026_17_pbks_vs_csk",
+            "title": "Punjab Kings vs Chennai Super Kings",
+            "league": "IPL 2026",
+            "team_a": "PBKS",
+            "team_b": "CSK",
+            "venue": "mohali",
+            "date": (today + timedelta(days=4)).strftime("%Y-%m-%dT19:30:00+05:30"),
+            "status": "upcoming",
+            "prize": "₹15 Crores",
+        },
     ]
 
 
@@ -152,30 +194,34 @@ async def _get_ipl_2026_schedule() -> List[Dict]:
 # Player Pool (realistic IPL 2026 data for seeding)
 # ---------------------------------------------------------------------------
 
-def _get_player_pool() -> List[Dict]:
+
+def _get_player_pool() -> list[dict]:
     """Return a realistic player pool for match seeding using all major teams."""
-    from pool import TEAMS  # TEAMS dictionary created dynamically 
-    
+    from pool import TEAMS  # TEAMS dictionary created dynamically
+
     players = []
     for team, roster in TEAMS.items():
         for p in roster:
             name, role, price = p
-            players.append({
-                "id": name.lower().replace(" ", "_"),
-                "name": name,
-                "role": role,
-                "price": price,
-                "predicted_points": price * 7.5, # Realistic baseline
-                "ownership_pct": price * 5.0,
-                "team": team,
-                "form_score": price * 8.0,
-            })
+            players.append(
+                {
+                    "id": name.lower().replace(" ", "_"),
+                    "name": name,
+                    "role": role,
+                    "price": price,
+                    "predicted_points": price * 7.5,  # Realistic baseline
+                    "ownership_pct": price * 5.0,
+                    "team": team,
+                    "form_score": price * 8.0,
+                }
+            )
     return players
 
 
 # ---------------------------------------------------------------------------
 # Redis Publisher — Push live data to Redis for WebSocket broadcasting
 # ---------------------------------------------------------------------------
+
 
 async def _get_redis_client():
     """Get an async Redis client. Returns None if unavailable."""
@@ -184,6 +230,7 @@ async def _get_redis_client():
         return None
     try:
         import redis.asyncio as aioredis
+
         client = aioredis.from_url(url, decode_responses=True, socket_connect_timeout=5)
         await client.ping()
         return client
@@ -192,6 +239,7 @@ async def _get_redis_client():
         # Try Upstash REST fallback
         try:
             from upstash_redis import Redis as UpstashRedis
+
             token = os.getenv("UPSTASH_REDIS_TOKEN", "")
             rest_url = os.getenv("UPSTASH_REDIS_REST_URL", "")
             if rest_url and token:
@@ -201,14 +249,14 @@ async def _get_redis_client():
         return None
 
 
-async def _push_to_redis(match_data: List[Dict], intel_data: Dict[str, Dict]) -> int:
+async def _push_to_redis(match_data: list[dict], intel_data: dict[str, dict]) -> int:
     """Push scraped data to Redis for real-time WebSocket consumption.
-    
+
     Keys pushed:
       - match_live:{match_id}  → latest match status + intel snapshot (TTL 30min)
       - match_schedule:all     → full upcoming schedule (TTL 1hr)
       - harvester:last_run     → timestamp of last successful harvest
-    
+
     Returns number of keys written.
     """
     redis = await _get_redis_client()
@@ -219,6 +267,7 @@ async def _push_to_redis(match_data: List[Dict], intel_data: Dict[str, Dict]) ->
     keys_written = 0
     try:
         import redis.asyncio as aioredis
+
         is_async = isinstance(redis, aioredis.Redis)
     except ImportError:
         is_async = False
@@ -227,19 +276,21 @@ async def _push_to_redis(match_data: List[Dict], intel_data: Dict[str, Dict]) ->
         # 1. Push each match's live data
         for match in match_data:
             match_id = match["id"]
-            payload = json.dumps({
-                "match_id": match_id,
-                "title": match["title"],
-                "league": match["league"],
-                "team_a": match.get("team_a", ""),
-                "team_b": match.get("team_b", ""),
-                "venue": match.get("venue", ""),
-                "status": match.get("status", "upcoming"),
-                "date": match.get("date", ""),
-                "prize": match.get("prize", ""),
-                "intelligence": intel_data.get(match_id, {}),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-            })
+            payload = json.dumps(
+                {
+                    "match_id": match_id,
+                    "title": match["title"],
+                    "league": match["league"],
+                    "team_a": match.get("team_a", ""),
+                    "team_b": match.get("team_b", ""),
+                    "venue": match.get("venue", ""),
+                    "status": match.get("status", "upcoming"),
+                    "date": match.get("date", ""),
+                    "prize": match.get("prize", ""),
+                    "intelligence": intel_data.get(match_id, {}),
+                    "updated_at": datetime.now(UTC).isoformat(),
+                }
+            )
             key = f"match_live:{match_id}"
             if is_async:
                 await redis.setex(key, 1800, payload)  # 30 min TTL
@@ -248,14 +299,21 @@ async def _push_to_redis(match_data: List[Dict], intel_data: Dict[str, Dict]) ->
             keys_written += 1
 
         # 2. Push full schedule index
-        schedule_payload = json.dumps({
-            "matches": [
-                {"id": m["id"], "title": m["title"], "league": m["league"],
-                 "date": m.get("date", ""), "status": m.get("status", "upcoming")}
-                for m in match_data
-            ],
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        })
+        schedule_payload = json.dumps(
+            {
+                "matches": [
+                    {
+                        "id": m["id"],
+                        "title": m["title"],
+                        "league": m["league"],
+                        "date": m.get("date", ""),
+                        "status": m.get("status", "upcoming"),
+                    }
+                    for m in match_data
+                ],
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+        )
         if is_async:
             await redis.setex("match_schedule:all", 3600, schedule_payload)
         else:
@@ -264,9 +322,9 @@ async def _push_to_redis(match_data: List[Dict], intel_data: Dict[str, Dict]) ->
 
         # 3. Set last run timestamp
         if is_async:
-            await redis.set("harvester:last_run", datetime.now(timezone.utc).isoformat())
+            await redis.set("harvester:last_run", datetime.now(UTC).isoformat())
         else:
-            redis.set("harvester:last_run", datetime.now(timezone.utc).isoformat())
+            redis.set("harvester:last_run", datetime.now(UTC).isoformat())
         keys_written += 1
 
         logger.info("harvester.redis_pushed", keys_written=keys_written)
@@ -274,10 +332,8 @@ async def _push_to_redis(match_data: List[Dict], intel_data: Dict[str, Dict]) ->
         logger.warning("harvester.redis_push_failed", error=str(exc))
     finally:
         if is_async:
-            try:
+            with suppress(Exception):
                 await redis.close()
-            except Exception:
-                pass
 
     return keys_written
 
@@ -286,17 +342,28 @@ async def _push_to_redis(match_data: List[Dict], intel_data: Dict[str, Dict]) ->
 # Turso DB Writer
 # ---------------------------------------------------------------------------
 
-async def _seed_matches_to_turso(matches: List[Dict]) -> int:
+
+async def _seed_matches_to_turso(matches: list[dict]) -> int:
     """Insert/update match schedule into Turso."""
     from db.connection import execute_query
+
     count = 0
     for m in matches:
         try:
             await execute_query(
                 """INSERT OR REPLACE INTO matches (id, title, league, team_a, team_b, venue, match_date, status, prize_pool)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (m["id"], m["title"], m["league"], m.get("team_a", ""), m.get("team_b", ""),
-                 m.get("venue", ""), m.get("date", ""), m.get("status", "upcoming"), m.get("prize", ""))
+                (
+                    m["id"],
+                    m["title"],
+                    m["league"],
+                    m.get("team_a", ""),
+                    m.get("team_b", ""),
+                    m.get("venue", ""),
+                    m.get("date", ""),
+                    m.get("status", "upcoming"),
+                    m.get("prize", ""),
+                ),
             )
             count += 1
         except Exception as exc:
@@ -307,13 +374,13 @@ async def _seed_matches_to_turso(matches: List[Dict]) -> int:
 async def _seed_intelligence_to_turso(match_id: str, intel_type: str, content: str, source: str) -> None:
     """Insert intelligence data into match_intelligence table."""
     from db.connection import execute_query
+
     try:
         intel_id = f"{match_id}_{intel_type}_{int(time.time())}"
         await execute_query(
             """INSERT OR REPLACE INTO match_intelligence (id, match_id, intel_type, content, source, fetched_at)
                VALUES (?, ?, ?, ?, ?, ?)""",
-            (intel_id, match_id, intel_type, content, source,
-             datetime.now(timezone.utc).isoformat())
+            (intel_id, match_id, intel_type, content, source, datetime.now(UTC).isoformat()),
         )
     except Exception as exc:
         logger.warning("harvester.intel_insert_failed", match_id=match_id, error=str(exc))
@@ -323,9 +390,10 @@ async def _seed_intelligence_to_turso(match_id: str, intel_type: str, content: s
 # Main Harvester Loop
 # ---------------------------------------------------------------------------
 
-async def run_harvest() -> Dict[str, Any]:
+
+async def run_harvest() -> dict[str, Any]:
     """Execute a full harvest cycle.
-    
+
     Pipeline:
     1. Ensure DB tables exist in Turso
     2. Seed match schedule → Turso
@@ -338,6 +406,7 @@ async def run_harvest() -> Dict[str, Any]:
 
     # Step 1: Ensure DB tables exist
     from db.connection import execute_query
+
     try:
         await execute_query("""
             CREATE TABLE IF NOT EXISTS matches (
@@ -400,9 +469,17 @@ async def run_harvest() -> Dict[str, Any]:
                     """INSERT OR REPLACE INTO players
                        (id, name, role, price, predicted_points, ownership_pct, team, form_score, match_id, status)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')""",
-                    (pid, player["name"], player["role"], player["price"],
-                     player["predicted_points"], player["ownership_pct"],
-                     player["team"], player.get("form_score", 50), match["id"])
+                    (
+                        pid,
+                        player["name"],
+                        player["role"],
+                        player["price"],
+                        player["predicted_points"],
+                        player["ownership_pct"],
+                        player["team"],
+                        player.get("form_score", 50),
+                        match["id"],
+                    ),
                 )
                 player_count += 1
             except Exception as exc:
@@ -411,11 +488,11 @@ async def run_harvest() -> Dict[str, Any]:
 
     # Step 4: Scrape live intelligence for each match
     intel_count = 0
-    intel_data: Dict[str, Dict] = {}  # Collected for Redis push
-    
+    intel_data: dict[str, dict] = {}  # Collected for Redis push
+
     for match in schedule:
         label = f"{match['team_a']} vs {match['team_b']}"
-        match_intel: Dict[str, Any] = {}
+        match_intel: dict[str, Any] = {}
 
         # 4a: Pitch & conditions
         pitch_results = await _ddg_search(f"{label} pitch report today cricket 2026", max_results=3)
@@ -437,9 +514,7 @@ async def run_harvest() -> Dict[str, Any]:
         weather = await _fetch_weather(match.get("venue", "default"))
         if "error" not in weather:
             weather_json = json.dumps(weather)
-            await _seed_intelligence_to_turso(
-                match["id"], "weather", weather_json, "open-meteo"
-            )
+            await _seed_intelligence_to_turso(match["id"], "weather", weather_json, "open-meteo")
             match_intel["weather"] = weather
             intel_count += 1
 
@@ -466,7 +541,7 @@ async def run_harvest() -> Dict[str, Any]:
         "intel": intel_count,
         "redis_keys": redis_keys,
         "elapsed_s": round(elapsed, 1),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
     }
     logger.info("harvester.cycle_complete", **result)
     return result
@@ -476,11 +551,12 @@ async def run_harvest() -> Dict[str, Any]:
 # Background Scheduler — runs inside FastAPI lifespan
 # ---------------------------------------------------------------------------
 
-_harvester_task: Optional[asyncio.Task] = None
+_harvester_task: asyncio.Task | None = None
+
 
 async def start_background_harvester(interval_minutes: int = 30):
     """Start the harvester as a background task that runs every `interval_minutes`.
-    
+
     Called from FastAPI lifespan. Runs the first harvest immediately,
     then repeats on the given interval.
     """
@@ -497,7 +573,7 @@ async def start_background_harvester(interval_minutes: int = 30):
                 break
             except Exception as exc:
                 logger.error("harvester.scheduled_run_error", error=str(exc))
-            
+
             # Wait for next interval
             await asyncio.sleep(interval_minutes * 60)
 
@@ -510,10 +586,8 @@ async def stop_background_harvester():
     global _harvester_task
     if _harvester_task and not _harvester_task.done():
         _harvester_task.cancel()
-        try:
+        with suppress(asyncio.CancelledError):
             await _harvester_task
-        except asyncio.CancelledError:
-            pass
         logger.info("harvester.background_stopped")
     _harvester_task = None
 
@@ -523,8 +597,9 @@ async def stop_background_harvester():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    from dotenv import load_dotenv
     import sys
+
+    from dotenv import load_dotenv
 
     # Add the api directory to path so imports work
     api_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

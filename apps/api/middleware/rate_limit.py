@@ -12,16 +12,17 @@ from __future__ import annotations
 import os
 import time
 from collections import defaultdict
-from typing import Dict, List
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
-from fastapi import Request, HTTPException
+from fastapi import HTTPException, Request
 
 # Routes exempt from rate limiting (health probes + monitoring — Performance Fix 2.2)
 _EXEMPT_PATHS: frozenset[str] = frozenset({"/health", "/ready", "/metrics", "/docs", "/redoc", "/openapi.json"})
@@ -29,7 +30,7 @@ _EXEMPT_PATHS: frozenset[str] = frozenset({"/health", "/ready", "/metrics", "/do
 # ---------------------------------------------------------------------------
 # In-memory fallback rate limiter (used when Redis is unavailable)
 # ---------------------------------------------------------------------------
-_inmem_counters: Dict[str, List[float]] = defaultdict(list)
+_inmem_counters: dict[str, list[float]] = defaultdict(list)
 _INMEM_WINDOW_SECONDS = 60
 
 
@@ -39,10 +40,7 @@ def _inmem_check(identifier: str, limit: int) -> tuple[int, int]:
     """
     now = time.time()
     # Prune expired entries
-    _inmem_counters[identifier] = [
-        ts for ts in _inmem_counters[identifier]
-        if now - ts < _INMEM_WINDOW_SECONDS
-    ]
+    _inmem_counters[identifier] = [ts for ts in _inmem_counters[identifier] if now - ts < _INMEM_WINDOW_SECONDS]
     _inmem_counters[identifier].append(now)
     current = len(_inmem_counters[identifier])
     # Approximate reset time
@@ -66,9 +64,7 @@ async def rate_limit_middleware(request: Request, call_next):
     # Determine tier-aware limit
     user_tier = getattr(request.state, "user_tier", "free")
     limit = int(
-        os.getenv("RATE_LIMIT_PAID_TIER", "1000")
-        if user_tier != "free"
-        else os.getenv("RATE_LIMIT_FREE_TIER", "100")
+        os.getenv("RATE_LIMIT_PAID_TIER", "1000") if user_tier != "free" else os.getenv("RATE_LIMIT_FREE_TIER", "100")
     )
 
     try:
@@ -111,10 +107,10 @@ async def rate_limit_middleware(request: Request, call_next):
     except Exception as exc:
         # DEFECT #5 FIX: Fallback to in-memory rate limiting instead of passing through
         logger.warning("rate_limit.redis_unavailable_using_fallback", error=str(exc))
-        
+
         current, reset_in = _inmem_check(identifier, limit)
         remaining = max(0, limit - current)
-        
+
         if current > limit:
             logger.warning("rate_limit.exceeded_inmem", ip=identifier, used=current, limit=limit)
             raise HTTPException(
@@ -128,7 +124,7 @@ async def rate_limit_middleware(request: Request, call_next):
                 },
                 headers={"Retry-After": str(reset_in)},
             )
-        
+
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(limit)
         response.headers["X-RateLimit-Remaining"] = str(remaining)

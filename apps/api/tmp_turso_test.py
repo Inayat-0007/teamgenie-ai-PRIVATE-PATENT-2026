@@ -1,10 +1,14 @@
 """Targeted harvester test — just seed ONE match + ONE player."""
+
 import sys, os, asyncio, traceback
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from db.connection import execute_query
+
 
 async def test():
     # 1. Create tables
@@ -31,7 +35,7 @@ async def test():
     try:
         await execute_query(
             "INSERT OR REPLACE INTO matches (id, title, league, team_a, team_b, venue, match_date, status, prize_pool) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            ("test_match_1", "CSK vs MI", "IPL 2026", "CSK", "MI", "chepauk", "2026-04-07", "upcoming", "10cr")
+            ("test_match_1", "CSK vs MI", "IPL 2026", "CSK", "MI", "chepauk", "2026-04-07", "upcoming", "10cr"),
         )
         print("OK: match inserted")
     except Exception as e:
@@ -63,7 +67,7 @@ async def test():
     try:
         await execute_query(
             "INSERT OR REPLACE INTO players (id, name, role, price, predicted_points, ownership_pct, team, form_score, match_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            ("virat_test", "Virat Kohli", "batsman", 10.5, 85.3, 67.3, "RCB", 88.0, "test_match_1", "active")
+            ("virat_test", "Virat Kohli", "batsman", 10.5, 85.3, 67.3, "RCB", 88.0, "test_match_1", "active"),
         )
         print("OK: player inserted")
     except Exception as e:
@@ -79,5 +83,6 @@ async def test():
     except Exception as e:
         print(f"FAIL verify: {e}")
         traceback.print_exc()
+
 
 asyncio.run(test())

@@ -1,7 +1,10 @@
 import asyncio
+
 from dotenv import load_dotenv
+
 load_dotenv()
 from db.connection import execute_query
+
 
 async def clean_db():
     try:
@@ -9,5 +12,6 @@ async def clean_db():
         print("Cleaned stale matches!")
     except Exception as e:
         print(f"ERR: {e}")
+
 
 asyncio.run(clean_db())

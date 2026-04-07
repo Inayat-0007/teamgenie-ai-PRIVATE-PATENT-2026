@@ -6,7 +6,6 @@ Single source of truth for all configuration values.
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 

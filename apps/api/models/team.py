@@ -6,46 +6,50 @@ Strict validation with enums for domain safety.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
-from typing import List, Optional
+from enum import StrEnum
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 
-class PlayerRole(str, Enum):
+class PlayerRole(StrEnum):
     """Valid cricket player roles."""
+
     BATSMAN = "batsman"
     BOWLER = "bowler"
     ALL_ROUNDER = "all_rounder"
     WICKET_KEEPER = "wicket_keeper"
 
 
-class MatchType(str, Enum):
+class MatchType(StrEnum):
     """Valid cricket match formats."""
+
     T20 = "T20"
     ODI = "ODI"
     TEST = "Test"
     T10 = "T10"
 
 
-class MatchStatus(str, Enum):
+class MatchStatus(StrEnum):
     """Match lifecycle status."""
+
     SCHEDULED = "scheduled"
     LIVE = "live"
     COMPLETED = "completed"
     ABANDONED = "abandoned"
 
 
-class UserTier(str, Enum):
+class UserTier(StrEnum):
     """Subscription tiers."""
+
     FREE = "free"
     PER_MATCH = "per_match"
     MONTHLY = "monthly"
     API = "api"
 
 
-class RiskLevel(str, Enum):
+class RiskLevel(StrEnum):
     """User risk tolerance for team generation."""
+
     SAFE = "safe"
     BALANCED = "balanced"
     AGGRESSIVE = "aggressive"
@@ -53,13 +57,14 @@ class RiskLevel(str, Enum):
 
 class PlayerModel(BaseModel):
     """Player entity with career statistics."""
+
     id: str
     name: str = Field(min_length=1, max_length=200)
     team: str = Field(min_length=1, max_length=100)
     role: PlayerRole
     current_price: float = Field(gt=0, le=20, description="Player credit price")
-    batting_style: Optional[str] = None
-    bowling_style: Optional[str] = None
+    batting_style: str | None = None
+    bowling_style: str | None = None
     career_average: float = Field(default=0.0, ge=0)
     strike_rate: float = Field(default=0.0, ge=0)
     is_active: bool = True
@@ -67,19 +72,20 @@ class PlayerModel(BaseModel):
 
 class TeamModel(BaseModel):
     """Generated team with exactly 11 players."""
+
     id: str
     user_id: str
     match_id: str
-    players: List[str] = Field(min_length=11, max_length=11, description="Exactly 11 player IDs")
+    players: list[str] = Field(min_length=11, max_length=11, description="Exactly 11 player IDs")
     captain_id: str
     vice_captain_id: str
     total_cost: float = Field(le=100, description="Must be within ₹100 budget")
     risk_score: float = Field(ge=0, le=1, default=0.5)
-    predicted_points: Optional[float] = None
-    actual_points: Optional[float] = None
+    predicted_points: float | None = None
+    actual_points: float | None = None
 
     @model_validator(mode="after")
-    def validate_team_integrity(self) -> "TeamModel":
+    def validate_team_integrity(self) -> TeamModel:
         """Cross-field validation that requires access to multiple fields."""
         # Captain and Vice-Captain must be different
         if self.captain_id == self.vice_captain_id:
@@ -102,6 +108,7 @@ class TeamModel(BaseModel):
 
 class MatchModel(BaseModel):
     """Cricket match entity."""
+
     id: str
     team_a: str
     team_b: str
@@ -120,10 +127,11 @@ class MatchModel(BaseModel):
 
 class UserModel(BaseModel):
     """User profile entity."""
+
     id: str
     email: str
-    username: Optional[str] = None
-    full_name: Optional[str] = None
+    username: str | None = None
+    full_name: str | None = None
     tier: UserTier = UserTier.FREE
     teams_created: int = Field(default=0, ge=0)
     accuracy_rate: float = Field(default=0.0, ge=0, le=100)

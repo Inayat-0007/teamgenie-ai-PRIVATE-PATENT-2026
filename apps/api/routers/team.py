@@ -13,20 +13,19 @@ UPGRADES APPLIED:
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import json
-import time
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
+
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from pydantic import BaseModel, Field
-from typing import Dict, List, Optional
 
 from core.settings import settings
 from core.version import get_version_info
@@ -39,9 +38,10 @@ router = APIRouter()
 # Request / Response Models
 # ---------------------------------------------------------------------------
 
+
 class UserPreferences(BaseModel):
-    favorite_players: List[str] = Field(default_factory=list, max_length=11)
-    avoid_players: List[str] = Field(default_factory=list, max_length=11)
+    favorite_players: list[str] = Field(default_factory=list, max_length=11)
+    avoid_players: list[str] = Field(default_factory=list, max_length=11)
 
 
 class TeamGenerateRequest(BaseModel):
@@ -54,12 +54,12 @@ class TeamGenerateRequest(BaseModel):
     )
     budget: float = Field(default=100.0, ge=0, le=100, description="Team budget constraint (₹)")
     risk_level: str = Field(default="balanced", pattern="^(safe|balanced|aggressive)$")
-    user_preferences: Optional[UserPreferences] = None
-    toss_winner: Optional[str] = Field(default=None, max_length=100, description="Team that won the toss")
-    toss_decision: Optional[str] = Field(default=None, pattern="^(bat|bowl)$", description="Toss decision")
-    team_a: Optional[str] = Field(default=None, max_length=100, description="Team A name for JIT search")
-    team_b: Optional[str] = Field(default=None, max_length=100, description="Team B name for JIT search")
-    venue: Optional[str] = Field(default=None, max_length=100, description="Venue key for weather lookup")
+    user_preferences: UserPreferences | None = None
+    toss_winner: str | None = Field(default=None, max_length=100, description="Team that won the toss")
+    toss_decision: str | None = Field(default=None, pattern="^(bat|bowl)$", description="Toss decision")
+    team_a: str | None = Field(default=None, max_length=100, description="Team A name for JIT search")
+    team_b: str | None = Field(default=None, max_length=100, description="Team B name for JIT search")
+    venue: str | None = Field(default=None, max_length=100, description="Venue key for weather lookup")
 
 
 class PlayerResponse(BaseModel):
@@ -80,7 +80,7 @@ class TeamReasoningResponse(BaseModel):
 
 
 class TeamResponse(BaseModel):
-    players: List[PlayerResponse]
+    players: list[PlayerResponse]
     captain: str
     vice_captain: str
     total_cost: float
@@ -89,7 +89,7 @@ class TeamResponse(BaseModel):
 
 
 class TimingBreakdown(BaseModel):
-    stages_ms: Dict[str, float] = Field(default_factory=dict)
+    stages_ms: dict[str, float] = Field(default_factory=dict)
     total_ms: float = 0.0
 
 
@@ -100,13 +100,14 @@ class GenerateResponse(BaseModel):
     cached: bool
     model_version: str = "2.0.0"
     mode: str = "demo"
-    timings: Optional[TimingBreakdown] = None
-    version_info: Optional[Dict] = None
+    timings: TimingBreakdown | None = None
+    version_info: dict | None = None
 
 
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @router.post("/generate", response_model=GenerateResponse)
 async def generate_team(
@@ -140,7 +141,9 @@ async def generate_team(
         # Phase 0: Subscription Tier Check (Phase 6)
         user_tier = getattr(http_request.state, "user_tier", "free")
         try:
+            from core.exceptions import ExternalServiceError, QuotaExceededError
             from services.subscription_service import subscription_service
+
             # Use the authenticated user's ID, not the per-request UUID
             quota_user_id = getattr(http_request.state, "user_id", request_id)
             await subscription_service.check_generation_quota(user_id=quota_user_id, tier=user_tier)
@@ -148,6 +151,11 @@ async def generate_team(
             pass  # Subscription service not yet deployed
         except HTTPException:
             raise  # Re-raise HTTP exceptions directly (don't wrap in 500)
+        except QuotaExceededError as quota_err:
+            raise HTTPException(status_code=429, detail={"code": "quota_exceeded", "message": str(quota_err)})
+        except ExternalServiceError as svc_err:
+            # DB unavailable — log and allow generation rather than blocking the user
+            logger.warning("quota.db_unavailable_allowing_generation", error=str(svc_err))
         except Exception as quota_err:
             raise HTTPException(status_code=429, detail={"code": "quota_exceeded", "message": str(quota_err)})
 
@@ -156,6 +164,7 @@ async def generate_team(
         with timer.stage("jit_scraper"):
             try:
                 from services.scraper_service import scraper_service
+
                 jit_context = await asyncio.wait_for(
                     scraper_service.get_match_context(
                         match_id=request.match_id,
@@ -165,7 +174,7 @@ async def generate_team(
                     ),
                     timeout=10.0,  # JIT scraper must not block generation
                 )
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.warning("jit.scraper_timeout", match_id=request.match_id)
             except Exception as jit_err:
                 logger.warning("jit.scraper_failed", error=str(jit_err))
@@ -279,6 +288,7 @@ async def get_team(team_id: str):
 # Background Tasks
 # ---------------------------------------------------------------------------
 
+
 async def _audit_generation(
     request_id: str,
     match_id: str,
@@ -289,6 +299,7 @@ async def _audit_generation(
     """Background audit logging (Upgrade #6)."""
     try:
         from services.audit_service import audit_service
+
         await audit_service.log_generation(
             request_id=request_id,
             match_id=match_id,

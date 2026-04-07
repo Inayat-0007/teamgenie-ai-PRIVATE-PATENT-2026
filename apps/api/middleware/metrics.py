@@ -6,18 +6,19 @@ Custom business metrics for TeamGenie AI.
 from __future__ import annotations
 
 import time
-from typing import Callable
+from collections.abc import Callable
 
 from fastapi import Request, Response
 
 try:
     from prometheus_client import (
-        Counter,
-        Histogram,
-        Gauge,
-        generate_latest,
         CONTENT_TYPE_LATEST,
+        Counter,
+        Gauge,
+        Histogram,
+        generate_latest,
     )
+
     _PROMETHEUS_AVAILABLE = True
 except ImportError:  # pragma: no cover
     _PROMETHEUS_AVAILABLE = False
@@ -126,7 +127,7 @@ def _normalize_path(path: str) -> str:
     parts = path.strip("/").split("/")
     normalized = []
     for part in parts:
-        if len(part) > 20 or part.replace("-", "").replace("_", "").isalnum() and not part.isalpha():
+        if len(part) > 20 or (part.replace("-", "").replace("_", "").isalnum() and not part.isalpha()):
             normalized.append("{id}")
         else:
             normalized.append(part)
