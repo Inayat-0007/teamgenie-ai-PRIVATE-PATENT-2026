@@ -38,13 +38,25 @@ def _inmem_check(identifier: str, limit: int) -> tuple[int, int]:
     Returns (current_count, reset_in_seconds).
     """
     now = time.time()
-    # Prune expired entries
+    # Prune expired entries for this IP
     _inmem_counters[identifier] = [
         ts for ts in _inmem_counters[identifier]
         if now - ts < _INMEM_WINDOW_SECONDS
     ]
+
+    # Add current timestamp
     _inmem_counters[identifier].append(now)
     current = len(_inmem_counters[identifier])
+
+    # Clean up stale IP keys to prevent unbounded memory growth
+    # Remove IPs that haven't been seen in the last window
+    stale_ips = [
+        ip for ip, timestamps in _inmem_counters.items()
+        if timestamps and now - timestamps[-1] > _INMEM_WINDOW_SECONDS
+    ]
+    for ip in stale_ips:
+        del _inmem_counters[ip]
+
     # Approximate reset time
     if _inmem_counters[identifier]:
         oldest = _inmem_counters[identifier][0]

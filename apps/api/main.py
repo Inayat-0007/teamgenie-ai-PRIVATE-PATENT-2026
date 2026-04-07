@@ -283,6 +283,7 @@ async def health_check(request: Request):
         checks["database"] = "ok"
     except Exception:
         checks["database"] = "degraded"
+        overall_healthy = False
         # DB being down degrades but doesn't kill the pod (demo mode still works)
 
     # Check Redis cache (500ms timeout)

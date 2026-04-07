@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import random
 import time
 import uuid
 from datetime import datetime, timezone
@@ -480,13 +481,19 @@ _harvester_task: Optional[asyncio.Task] = None
 
 async def start_background_harvester(interval_minutes: int = 30):
     """Start the harvester as a background task that runs every `interval_minutes`.
-    
-    Called from FastAPI lifespan. Runs the first harvest immediately,
-    then repeats on the given interval.
+
+    Called from FastAPI lifespan. Adds jitter to prevent thundering herd when
+    multiple K8s replicas start simultaneously (Audit Fix #7).
     """
     global _harvester_task
 
     async def _loop():
+        # Audit Fix #7: Add jitter (0-5 minutes) to prevent thundering herd
+        # when multiple K8s replicas start simultaneously
+        jitter_seconds = random.uniform(0, 300)
+        logger.info("harvester.jitter_delay", seconds=round(jitter_seconds))
+        await asyncio.sleep(jitter_seconds)
+
         while True:
             try:
                 logger.info("harvester.scheduled_run_start")
@@ -497,7 +504,7 @@ async def start_background_harvester(interval_minutes: int = 30):
                 break
             except Exception as exc:
                 logger.error("harvester.scheduled_run_error", error=str(exc))
-            
+
             # Wait for next interval
             await asyncio.sleep(interval_minutes * 60)
 
