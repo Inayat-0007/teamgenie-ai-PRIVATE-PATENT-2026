@@ -6,13 +6,15 @@ Gracefully degrades when Redis is unavailable.
 from __future__ import annotations
 
 import os
-from typing import Optional
+from contextlib import suppress
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 
@@ -51,7 +53,7 @@ class CacheService:
             finally:
                 self.redis = None
 
-    async def get(self, key: str) -> Optional[str]:
+    async def get(self, key: str) -> str | None:
         """Get a cached value. Returns None on miss or if Redis is unavailable."""
         if not self.redis:
             return None
@@ -92,10 +94,8 @@ class CacheService:
         """Set TTL on an existing key."""
         if not self.redis:
             return
-        try:
+        with suppress(Exception):
             await self.redis.expire(key, seconds)
-        except Exception:
-            pass
 
     async def exists(self, key: str) -> bool:
         """Check if key exists in cache."""

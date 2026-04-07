@@ -10,18 +10,18 @@ and queries Turso for historical form when available.
 
 from __future__ import annotations
 
-import random
-import statistics
-from typing import Any, Dict, List
+from typing import Any
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
-from core.settings import settings, AppMode
+from core.settings import AppMode, settings
 
 
 class ProjectionService:
@@ -32,9 +32,9 @@ class ProjectionService:
 
     async def compute_projections(
         self,
-        players: List[Dict[str, Any]],
-        match_context: Dict[str, Any] | None = None,
-    ) -> List[Dict[str, Any]]:
+        players: list[dict[str, Any]],
+        match_context: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         For each player, compute:
         - expected_points (based on actual predicted_points + form adjustment)
@@ -51,16 +51,14 @@ class ProjectionService:
         for player in players:
             pid = player.get("id", "")
             base_points = float(player.get("predicted_points", 50))
-            
+
             # Use DB form score if available, else use player's own form_score field
-            form = float(
-                db_form_scores.get(pid, player.get("form_score", 50))
-            )
-            
+            form = float(db_form_scores.get(pid, player.get("form_score", 50)))
+
             # Form adjustment: form_score > 70 = trending up, < 40 = trending down
             form_multiplier = 0.85 + (form / 100) * 0.30  # Range: 0.85 to 1.15
             expected = base_points * form_multiplier
-            
+
             # Variance based on role (bowlers are more volatile than batsmen)
             role = player.get("role", "batsman").lower()
             role_variance = {
@@ -70,7 +68,7 @@ class ProjectionService:
                 "wicket_keeper": 14.0,
             }
             stdev = role_variance.get(role, 15.0)
-            
+
             # Floor/ceiling from expected ± standard deviation
             floor_val = max(0, expected - stdev)
             ceiling_val = expected + stdev
@@ -89,7 +87,7 @@ class ProjectionService:
         logger.info("projections.computed", player_count=len(enriched))
         return enriched
 
-    async def _load_db_form_scores(self) -> Dict[str, float]:
+    async def _load_db_form_scores(self) -> dict[str, float]:
         """Load real form_score values from Turso players table.
         Returns {player_id: form_score} dict. Empty dict on failure.
         """
@@ -97,9 +95,8 @@ class ProjectionService:
             return {}
         try:
             from db.connection import execute_query
-            rows = await execute_query(
-                "SELECT id, form_score FROM players WHERE form_score IS NOT NULL LIMIT 500"
-            )
+
+            rows = await execute_query("SELECT id, form_score FROM players WHERE form_score IS NOT NULL LIMIT 500")
             scores = {}
             for row in rows:
                 # Row is a tuple: (id, form_score)
@@ -110,12 +107,12 @@ class ProjectionService:
             logger.debug("projections.db_form_unavailable", error=str(exc))
             return {}
 
-    def _compute_form(self, scores: List[float]) -> float:
+    def _compute_form(self, scores: list[float]) -> float:
         """Exponentially-weighted average: recent matches count more."""
         if not scores:
             return 50.0
-        weights = [2 ** i for i in range(len(scores))]
-        weighted_sum = sum(s * w for s, w in zip(scores, weights))
+        weights = [2**i for i in range(len(scores))]
+        weighted_sum = sum(s * w for s, w in zip(scores, weights, strict=False))
         return weighted_sum / sum(weights)
 
 

@@ -10,9 +10,11 @@ import traceback
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 from fastapi import Request
@@ -23,8 +25,15 @@ _MAX_TRACEBACK_CHARS = 4000
 
 # Patterns to redact from logged tracebacks (env secrets, tokens, etc.)
 _SENSITIVE_PATTERNS = (
-    "API_KEY", "SECRET", "TOKEN", "PASSWORD", "DSN",
-    "SUPABASE", "PINECONE", "REDIS_URL", "AUTH_TOKEN",
+    "API_KEY",
+    "SECRET",
+    "TOKEN",
+    "PASSWORD",
+    "DSN",
+    "SUPABASE",
+    "PINECONE",
+    "REDIS_URL",
+    "AUTH_TOKEN",
 )
 
 
@@ -55,6 +64,7 @@ async def error_handler_middleware(request: Request, call_next):
 
         # Check if this is a custom TeamGenie exception with its own status code
         from core.exceptions import TeamGenieError
+
         if isinstance(exc, TeamGenieError):
             logger.warning(
                 "handled_error",
@@ -92,6 +102,7 @@ async def error_handler_middleware(request: Request, call_next):
         # Forward to Sentry if available AND initialized
         try:
             import sentry_sdk
+
             if sentry_sdk.Hub.current.client is not None:
                 sentry_sdk.capture_exception(exc)
         except (ImportError, AttributeError, Exception):

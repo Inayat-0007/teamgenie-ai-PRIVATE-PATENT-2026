@@ -14,19 +14,20 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Set
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
-from fastapi import Request, HTTPException
+from fastapi import HTTPException, Request
 
 try:
-    from jose import jwt, JWTError
+    from jose import JWTError, jwt
 except ImportError:
     jwt = None  # type: ignore[assignment]
     JWTError = Exception  # type: ignore[misc,assignment]
@@ -36,19 +37,21 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 # Exact-match public routes
-PUBLIC_ROUTES: frozenset[str] = frozenset({
-    "/health",
-    "/ready",
-    "/docs",
-    "/redoc",
-    "/openapi.json",
-    # "/metrics" — REMOVED: must require auth to prevent competitor scraping (Audit Fix #09)
-    "/api/auth/login",
-    "/api/auth/register",
-    "/api/auth/forgot-password",
-    "/api/auth/refresh",
-    "/api/payment/webhook",
-})
+PUBLIC_ROUTES: frozenset[str] = frozenset(
+    {
+        "/health",
+        "/ready",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        # "/metrics" — REMOVED: must require auth to prevent competitor scraping (Audit Fix #09)
+        "/api/auth/login",
+        "/api/auth/register",
+        "/api/auth/forgot-password",
+        "/api/auth/refresh",
+        "/api/payment/webhook",
+    }
+)
 
 # Prefix-match public routes (for paths with dynamic segments)
 PUBLIC_PREFIXES: tuple[str, ...] = (
@@ -63,7 +66,7 @@ _CLOCK_SKEW_TOLERANCE = 5  # OWASP recommends ≤5s to limit stolen-token replay
 # ---------------------------------------------------------------------------
 # Redis-backed Token Revocation List (with in-memory fallback)
 # ---------------------------------------------------------------------------
-_revoked_tokens: Set[str] = set()  # In-memory fallback when Redis is down
+_revoked_tokens: set[str] = set()  # In-memory fallback when Redis is down
 _MAX_REVOCATION_LIST_SIZE = 10000  # Prevent unbounded memory growth
 _REVOCATION_TTL_SECONDS = 86400  # 24h — matches max JWT lifetime
 
@@ -76,11 +79,7 @@ def _get_redis():
     global _redis_cache
     if _redis_cache is not None:
         return _redis_cache
-    try:
-        from fastapi import Request
-        # Will be set on first request via middleware
-    except Exception:
-        pass
+    # Will be set on first request via middleware
     return _redis_cache
 
 
@@ -129,6 +128,7 @@ async def is_token_revoked(token_jti: str) -> bool:
 # ---------------------------------------------------------------------------
 # Middleware
 # ---------------------------------------------------------------------------
+
 
 def _is_public_route(path: str) -> bool:
     """Check if a path is public (exact + prefix match)."""
@@ -202,8 +202,8 @@ async def verify_jwt(request: Request, call_next):
             secret,
             algorithms=[algorithm],
             options={
-                "verify_exp": True,      # Verify expiration
-                "verify_iat": True,      # Verify issued-at
+                "verify_exp": True,  # Verify expiration
+                "verify_iat": True,  # Verify issued-at
                 "require": ["exp", "sub"],  # These claims must be present
             },
         )
@@ -241,14 +241,14 @@ async def verify_jwt(request: Request, call_next):
         error_msg = str(exc)
         # MASTER LEVEL LOGGING: Identify Mismatch
         logger.warning(
-            "auth.invalid_token", 
+            "auth.invalid_token",
             error=error_msg,
             token_sample=token[:10] + "...",
-            reason="Likely SUPABASE_JWT_SECRET mismatch in .env vs Supabase Dashboard"
+            reason="Likely SUPABASE_JWT_SECRET mismatch in .env vs Supabase Dashboard",
         )
         raise HTTPException(
-            status_code=401, 
-            detail=f"Auth Error: {error_msg}. ACTION: Ensure SUPABASE_JWT_SECRET in .env matches the one in your Supabase Dashboard -> Settings -> API."
+            status_code=401,
+            detail=f"Auth Error: {error_msg}. ACTION: Ensure SUPABASE_JWT_SECRET in .env matches the one in your Supabase Dashboard -> Settings -> API.",
         )
 
     return await call_next(request)

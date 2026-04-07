@@ -6,14 +6,17 @@ Wraps external API calls with retry, timeout, and fallback logic.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Optional
+from typing import Any
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 
@@ -21,7 +24,7 @@ class CircuitBreaker:
     """Wrap external API calls with retry + fallback for 99.9% uptime."""
 
     @staticmethod
-    def with_fallback(fallback_func: Optional[Callable] = None, max_retries: int = 3):
+    def with_fallback(fallback_func: Callable | None = None, max_retries: int = 3):
         """Decorator that retries on failure and falls back to a safe function."""
 
         def decorator(func: Callable) -> Callable:
@@ -42,7 +45,7 @@ class CircuitBreaker:
                             error=str(exc),
                         )
                         if attempt < max_retries:
-                            await asyncio.sleep(min(2 ** attempt, 10))
+                            await asyncio.sleep(min(2**attempt, 10))
 
                 # All retries exhausted → try fallback
                 if fallback_func is not None:

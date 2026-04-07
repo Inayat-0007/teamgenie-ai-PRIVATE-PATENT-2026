@@ -22,6 +22,12 @@ ignore = [
     "B904",   # raise from within except
 ]
 
+[tool.ruff.lint.per-file-ignores]
+# load_dotenv() must precede other imports so env vars are set before modules read them
+"main.py" = ["E402"]
+"clean_db.py" = ["E402"]
+"test_redis_connect.py" = ["E402"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["apps", "packages", "services", "routers", "middleware", "models", "db"]
 

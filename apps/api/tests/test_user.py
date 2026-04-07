@@ -14,9 +14,11 @@ os.environ["ENABLE_AI_FIREWALL"] = "false"
 os.environ["ENABLE_SELF_HEALING"] = "false"
 os.environ["SUPABASE_JWT_SECRET"] = "test-jwt-secret-for-ci"
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
+
 import pytest
 from fastapi.testclient import TestClient
+
 from main import app
 
 
@@ -25,9 +27,11 @@ def client():
     with TestClient(app) as c:
         yield c
 
+
 @pytest.fixture(autouse=True)
 def mock_execute_query():
     """Mock database queries to prevent real Turso requests during tests."""
+
     async def fake_execute(query, params=None):
         if "UPDATE" in query:
             return []
@@ -44,6 +48,7 @@ def mock_execute_query():
 # ---------------------------------------------------------------------------
 # GET /api/user/me
 # ---------------------------------------------------------------------------
+
 
 def test_get_profile_returns_user_data(client):
     """Profile endpoint should return user data."""
@@ -67,6 +72,7 @@ def test_get_profile_includes_stats(client):
 # PUT /api/user/me
 # ---------------------------------------------------------------------------
 
+
 def test_update_profile_valid_name(client):
     """Updating full_name should succeed."""
     response = client.put("/api/user/me", json={"full_name": "Test User"})
@@ -89,6 +95,7 @@ def test_update_profile_empty_body(client):
 # ---------------------------------------------------------------------------
 # GET /api/user/data-export (GDPR/DPDP compliance)
 # ---------------------------------------------------------------------------
+
 
 def test_data_export_returns_json(client):
     """Data export should return JSON with required GDPR fields."""
@@ -125,6 +132,7 @@ def test_data_export_includes_user_info(client):
 # DELETE /api/user/me (Security Fix 1.7 — requires re-auth)
 # ---------------------------------------------------------------------------
 
+
 def test_delete_account_requires_password(client):
     """Account deletion without password should be rejected (Security Fix 1.7)."""
     response = client.request("DELETE", "/api/user/me", json={})
@@ -141,6 +149,7 @@ def test_delete_account_missing_body(client):
 # POST /api/user/withdraw-consent (DPDP compliance)
 # ---------------------------------------------------------------------------
 
+
 def test_withdraw_consent(client):
     """Withdraw consent should return success message."""
     response = client.post("/api/user/withdraw-consent")
@@ -154,6 +163,7 @@ def test_withdraw_consent(client):
 # Edge cases
 # ---------------------------------------------------------------------------
 
+
 def test_user_endpoints_return_json(client):
     """All user endpoints should return proper JSON content-type."""
     endpoints = [
@@ -163,5 +173,4 @@ def test_user_endpoints_return_json(client):
     ]
     for method, path in endpoints:
         response = client.request(method, path)
-        assert "application/json" in response.headers.get("content-type", ""), \
-            f"{method} {path} did not return JSON"
+        assert "application/json" in response.headers.get("content-type", ""), f"{method} {path} did not return JSON"

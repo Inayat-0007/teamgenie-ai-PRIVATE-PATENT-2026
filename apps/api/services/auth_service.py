@@ -18,12 +18,14 @@ except ImportError:
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
-from core.exceptions import AuthenticationError, ValidationError, ExternalServiceError, QuotaExceededError
+from core.exceptions import AuthenticationError, ExternalServiceError, QuotaExceededError, ValidationError
 
 _EMAIL_PATTERN = re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
 _MIN_PASSWORD_LENGTH = 8
@@ -270,7 +272,6 @@ class AuthService:
             data = resp.json()
 
             if resp.status_code != 200:
-                msg = data.get("error_description") or data.get("msg", "Token refresh failed")
                 raise AuthenticationError("Session expired. Please log in again.")
 
             logger.info("auth.token_refreshed")
@@ -301,8 +302,7 @@ class AuthService:
                 logger.info("auth.password_reset_sent", email=email[:3] + "***")
             else:
                 data = resp.json()
-                logger.warning("auth.password_reset_issue", status=resp.status_code,
-                               error=str(data)[:200])
+                logger.warning("auth.password_reset_issue", status=resp.status_code, error=str(data)[:200])
         except Exception as exc:
             logger.warning("auth.password_reset_error", error=str(exc)[:200])
 
@@ -312,20 +312,22 @@ class AuthService:
 # Used by DELETE /api/user/me to verify identity before destructive action
 # ---------------------------------------------------------------------------
 
+
 async def verify_password(user_id: str, password: str) -> bool:
     """Verify a user's password by attempting a Supabase sign-in.
-    
+
     This is used for re-authentication before destructive actions
     like account deletion (Security Fix 1.7).
     """
     try:
         from db.connection import execute_query
+
         # Get user's email from DB
         rows = await execute_query("SELECT email FROM users WHERE id = ?", (user_id,))
         if not rows:
             return False
         email = rows[0][0]
-        
+
         # Attempt sign-in with Supabase to verify password
         auth = AuthService()
         await auth.sign_in(email, password)
@@ -339,4 +341,3 @@ async def verify_password(user_id: str, password: str) -> bool:
             logger.warning("auth.verify_password_dev_bypass", user_id=user_id)
             return True
         return False
-

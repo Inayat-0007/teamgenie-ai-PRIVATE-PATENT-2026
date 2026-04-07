@@ -7,10 +7,6 @@ from __future__ import annotations
 
 import os
 import sys
-import json
-import hmac
-import hashlib
-import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 os.environ["PYTHON_ENV"] = "test"
@@ -18,9 +14,11 @@ os.environ["ENABLE_AI_FIREWALL"] = "false"
 os.environ["ENABLE_SELF_HEALING"] = "false"
 os.environ["SUPABASE_JWT_SECRET"] = "test-jwt-secret-for-ci"
 
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
+
 import pytest
 from fastapi.testclient import TestClient
+
 from main import app
 
 
@@ -33,6 +31,7 @@ def client():
 # ---------------------------------------------------------------------------
 # POST /api/payment/create-order
 # ---------------------------------------------------------------------------
+
 
 def test_create_order_pro_plan(client):
     """Valid 'pro' plan should return an order with amount 19900 paise."""
@@ -78,6 +77,7 @@ def test_create_order_simulated_mode(client):
 # POST /api/payment/verify
 # ---------------------------------------------------------------------------
 
+
 def test_verify_payment_requires_all_fields(client):
     """Missing fields should be rejected."""
     response = client.post("/api/payment/verify", json={"plan_id": "pro"})
@@ -86,24 +86,30 @@ def test_verify_payment_requires_all_fields(client):
 
 def test_verify_payment_invalid_plan(client):
     """Invalid plan in verify should be rejected."""
-    response = client.post("/api/payment/verify", json={
-        "razorpay_order_id": "order_123",
-        "razorpay_payment_id": "pay_123",
-        "razorpay_signature": "sig_123",
-        "plan_id": "invalid",
-    })
+    response = client.post(
+        "/api/payment/verify",
+        json={
+            "razorpay_order_id": "order_123",
+            "razorpay_payment_id": "pay_123",
+            "razorpay_signature": "sig_123",
+            "plan_id": "invalid",
+        },
+    )
     assert response.status_code == 422
 
 
 @patch("db.connection.execute_query", new_callable=AsyncMock)
 def test_verify_payment_simulated_success(mock_execute, client):
     """In test mode without Razorpay, simulated verification should work."""
-    response = client.post("/api/payment/verify", json={
-        "razorpay_order_id": "order_sim_123",
-        "razorpay_payment_id": "pay_sim_123",
-        "razorpay_signature": "simulated_signature",
-        "plan_id": "pro",
-    })
+    response = client.post(
+        "/api/payment/verify",
+        json={
+            "razorpay_order_id": "order_sim_123",
+            "razorpay_payment_id": "pay_sim_123",
+            "razorpay_signature": "simulated_signature",
+            "plan_id": "pro",
+        },
+    )
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "success"
@@ -114,14 +120,13 @@ def test_verify_payment_simulated_success(mock_execute, client):
 # POST /api/payment/webhook
 # ---------------------------------------------------------------------------
 
+
 def test_webhook_payment_captured(client):
     """Webhook for payment.captured should return ok."""
     payload = {
         "event": "payment.captured",
         "account_id": "acc_123",
-        "payload": {
-            "payment": {"entity": {"id": "pay_test_001"}}
-        },
+        "payload": {"payment": {"entity": {"id": "pay_test_001"}}},
     }
     response = client.post("/api/payment/webhook", json=payload)
     assert response.status_code == 200
@@ -132,14 +137,13 @@ def test_webhook_idempotency_guard(client):
     """Replaying the same event_id should return duplicate=True (Security Fix 1.2)."""
     # Clear the processed events first
     from routers.payment import _processed_webhook_events
+
     _processed_webhook_events.clear()
 
     payload = {
         "event": "payment.captured",
         "account_id": "acc_idempotency",
-        "payload": {
-            "payment": {"entity": {"id": "pay_idem_001"}}
-        },
+        "payload": {"payment": {"entity": {"id": "pay_idem_001"}}},
     }
 
     # First call — should process normally
@@ -178,12 +182,11 @@ def test_webhook_subscription_cancelled(client):
     payload = {
         "event": "subscription.cancelled",
         "account_id": "acc_cancel",
-        "payload": {
-            "subscription": {"entity": {"id": "sub_cancel_001"}}
-        },
+        "payload": {"subscription": {"entity": {"id": "sub_cancel_001"}}},
     }
     # Clear idempotency set for fresh test
     from routers.payment import _processed_webhook_events
+
     _processed_webhook_events.discard("acc_cancel:subscription.cancelled:sub_cancel_001")
 
     response = client.post("/api/payment/webhook", json=payload)
@@ -193,6 +196,7 @@ def test_webhook_subscription_cancelled(client):
 # ---------------------------------------------------------------------------
 # GET /api/payment/status
 # ---------------------------------------------------------------------------
+
 
 def test_payment_status_free_user(client):
     """Unauthenticated/free user should return free tier."""

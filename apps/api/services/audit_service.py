@@ -7,17 +7,18 @@ from __future__ import annotations
 
 import json
 import os
-from datetime import datetime, timezone
-from typing import Any, Optional
+from datetime import UTC, datetime
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
-from core.settings import settings, AppMode
+from core.settings import settings
 from core.version import ENGINE_VERSION
 
 
@@ -39,7 +40,7 @@ class AuditService:
         """Record a full generation audit entry."""
         audit_entry = {
             "request_id": request_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "match_id": match_id,
             "mode": settings.APP_MODE.value,
             "engine_version": ENGINE_VERSION,

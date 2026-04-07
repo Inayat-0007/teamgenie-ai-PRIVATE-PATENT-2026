@@ -9,11 +9,12 @@ import asyncio
 import os
 import time
 import uuid
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Final
 
 # Load .env EARLY so all os.getenv() calls in middleware/services see the values
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from fastapi import FastAPI, Request
@@ -23,9 +24,11 @@ from fastapi.responses import JSONResponse
 # --- Structured logging (graceful fallback) ---
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
 
 # --- Sentry (optional — explicit import guard with warning) ---
@@ -33,6 +36,7 @@ _sentry_dsn = os.getenv("SENTRY_DSN")
 _sentry_available = False
 try:
     import sentry_sdk
+
     _sentry_available = True
     if _sentry_dsn:
         sentry_sdk.init(
@@ -47,13 +51,14 @@ except ImportError:
     sentry_sdk = None  # type: ignore[assignment]
     logger.warning("sentry.unavailable", reason="sentry_sdk package not installed — error tracking disabled")
 
-from routers import auth, match, player, team, user, payment, admin
+from routers import admin, auth, match, payment, player, team, user
 
 # ---------------------------------------------------------------------------
 # Metrics — prometheus_client middleware + /metrics endpoint (issue #3/#9 fix)
 # ---------------------------------------------------------------------------
 try:
-    from middleware.metrics import metrics_middleware, metrics_endpoint
+    from middleware.metrics import metrics_endpoint, metrics_middleware
+
     _metrics_middleware_available = True
 except Exception:
     _metrics_middleware_available = False
@@ -78,7 +83,7 @@ IS_DEV = os.getenv("PYTHON_ENV", "development") != "production"
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown lifecycle."""
-    logger.info("api.starting", version=API_VERSION) if hasattr(logger, 'info') else None
+    logger.info("api.starting", version=API_VERSION) if hasattr(logger, "info") else None
 
     # ── Security Fix 1.3: Block DEMO mode in production ──
     if not IS_DEV and os.getenv("APP_MODE", "").upper() == "DEMO":
@@ -92,17 +97,19 @@ async def lifespan(app: FastAPI):
     # Startup — warm connections (graceful)
     try:
         from services.cache_service import CacheService
+
         cache = CacheService()
         await cache.connect()
         app.state.cache = cache
     except Exception as exc:
-        logger.warning("redis.connect_failed", error=str(exc)) if hasattr(logger, 'warning') else None
+        logger.warning("redis.connect_failed", error=str(exc)) if hasattr(logger, "warning") else None
         app.state.cache = None
 
     # Startup — Intelligence Harvester background scheduler (Agent 0)
     # Runs every 30 minutes: scrapes live data → Turso DB + Redis → WebSocket
     try:
         from workers.harvester import start_background_harvester
+
         await start_background_harvester(interval_minutes=30)
         logger.info("harvester.background_scheduled", interval_min=30)
     except Exception as exc:
@@ -113,16 +120,15 @@ async def lifespan(app: FastAPI):
     # Shutdown — stop harvester
     try:
         from workers.harvester import stop_background_harvester
+
         await stop_background_harvester()
     except Exception:
         pass
 
     # Shutdown — close Redis
     if hasattr(app.state, "cache") and app.state.cache:
-        try:
+        with suppress(Exception):
             await app.state.cache.disconnect()
-        except Exception:
-            pass
 
 
 # ---------------------------------------------------------------------------
@@ -187,24 +193,29 @@ async def add_request_metadata(request: Request, call_next):
 
 # ── 6. Error handler (catch-all for unhandled exceptions → clean JSON) ──
 from middleware.error_handler import error_handler_middleware
+
 app.middleware("http")(error_handler_middleware)
 
 # ── 5. Self-healing (experimental — opt-in, disabled by default) ──
 if os.getenv("ENABLE_SELF_HEALING", "false").lower() == "true":
     from middleware.self_healing import self_healing_middleware
+
     app.middleware("http")(self_healing_middleware)
 
 # ── 4. Auth — JWT verification (AFTER error handler so auth failures → clean JSON) ──
 from middleware.auth import verify_jwt
+
 app.middleware("http")(verify_jwt)
 
 # ── 3. AI Firewall — block malicious payloads BEFORE auth (opt-in) ──
 if os.getenv("ENABLE_AI_FIREWALL", "false").lower() == "true":
     from security.ai_firewall import ai_firewall_check
+
     app.middleware("http")(ai_firewall_check)
 
 # ── 2. Rate limiter (block abuse before expensive JWT verify) ──
 from middleware.rate_limit import rate_limit_middleware
+
 app.middleware("http")(rate_limit_middleware)
 
 # ── 1. Prometheus metrics — outermost, times everything (no-op if not installed) ──
@@ -214,9 +225,7 @@ if _metrics_middleware_available and metrics_middleware is not None:
 # ── 0. CORS (registered last = executes first / outermost) ──
 # This MUST be the outermost middleware so it can attach headers to ALL responses,
 # including early error returns from the firewall, rate limiter, or error handler.
-_allowed_origins = os.getenv(
-    "CORS_ORIGINS", os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")
-).split(",")
+_allowed_origins = os.getenv("CORS_ORIGINS", os.getenv("ALLOWED_ORIGINS", "http://localhost:3000")).split(",")
 
 # ── Security Fix 1.5: Block wildcard CORS in production ──
 if not IS_DEV and "*" in [o.strip() for o in _allowed_origins]:
@@ -237,8 +246,6 @@ app.add_middleware(
 )
 
 
-
-
 # ---------------------------------------------------------------------------
 # Routers
 # ---------------------------------------------------------------------------
@@ -253,6 +260,7 @@ app.include_router(admin.router, prefix="/api/admin", tags=["Administration"])
 # /metrics — prefer the prometheus_client (generate_latest) version; fall back to in-memory
 if _metrics_middleware_available and metrics_endpoint is not None:
     from fastapi import APIRouter as _APIRouter
+
     _metrics_api_router = _APIRouter()
     _metrics_api_router.add_api_route("/metrics", metrics_endpoint, methods=["GET"], tags=["Monitoring"])
     app.include_router(_metrics_api_router)
@@ -266,7 +274,7 @@ elif metrics_router:
 @app.get("/health", tags=["Health"])
 async def health_check(request: Request):
     """Real health check — verifies critical dependencies are reachable.
-    
+
     Audit Fix: Previously returned 200 unconditionally even when
     Turso and Redis were both down. K8s had no idea the pod was broken.
     """
@@ -276,6 +284,7 @@ async def health_check(request: Request):
     # Check Turso DB (500ms timeout)
     try:
         from db.connection import execute_query
+
         await asyncio.wait_for(
             execute_query("SELECT 1"),
             timeout=0.5,
@@ -378,6 +387,7 @@ async def diagnostics(request: Request):
 # ---------------------------------------------------------------------------
 from core.exceptions import TeamGenieError
 
+
 @app.exception_handler(TeamGenieError)
 async def teamgenie_exception_handler(request: Request, exc: TeamGenieError):
     """Handle all custom TeamGenie exceptions with proper status codes."""
@@ -413,10 +423,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 
     # Forward to Sentry if available and configured
     if _sentry_available and _sentry_dsn:
-        try:
-            sentry_sdk.capture_exception(exc)
-        except Exception:
-            pass  # Never let Sentry reporting crash the error handler
+        with suppress(Exception):
+            sentry_sdk.capture_exception(exc)  # Never let Sentry reporting crash the error handler
 
     # Truncate error message for logging (prevents log bloat from giant payloads)
     error_msg = str(exc)[:500]

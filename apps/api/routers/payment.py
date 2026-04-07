@@ -19,14 +19,16 @@ import time
 
 try:
     import structlog
+
     logger = structlog.get_logger(__name__)
 except ImportError:
     import logging
+
     logger = logging.getLogger(__name__)
+
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
-from typing import Optional
 
 router = APIRouter()
 
@@ -114,6 +116,7 @@ def _verify_signature(order_id: str, payment_id: str, signature: str) -> bool:
 # Endpoints
 # ---------------------------------------------------------------------------
 
+
 @router.post("/create-order")
 async def create_order(order_data: CreateOrderRequest, request: Request):
     """Create a Razorpay order for subscription upgrade."""
@@ -128,22 +131,24 @@ async def create_order(order_data: CreateOrderRequest, request: Request):
             "order_id": f"order_sim_{int(time.time())}",
             "amount": plan["amount"],
             "currency": plan["currency"],
-            "plan": request.plan_id,
+            "plan": order_data.plan_id,
             "key_id": os.getenv("RAZORPAY_KEY_ID", "rzp_test_simulated"),
             "simulated": True,
             "notes": "Razorpay not configured — simulated order for development",
         }
 
     try:
-        order = client.order.create({
-            "amount": plan["amount"],
-            "currency": plan["currency"],
-            "receipt": f"tg_{order_data.plan_id}_{int(time.time())}",
-            "notes": {
-                "plan": order_data.plan_id,
-                "user_id": getattr(request.state, "user_id", "unknown"),
-            },
-        })
+        order = client.order.create(
+            {
+                "amount": plan["amount"],
+                "currency": plan["currency"],
+                "receipt": f"tg_{order_data.plan_id}_{int(time.time())}",
+                "notes": {
+                    "plan": order_data.plan_id,
+                    "user_id": getattr(request.state, "user_id", "unknown"),
+                },
+            }
+        )
 
         logger.info("payment.order_created", order_id=order["id"], plan=order_data.plan_id)
 
@@ -169,11 +174,13 @@ async def verify_payment(verification_data: VerifyPaymentRequest, request: Reque
     client = _get_razorpay_client()
     if client:
         try:
-            client.utility.verify_payment_signature({
-                "razorpay_order_id": request.razorpay_order_id,
-                "razorpay_payment_id": request.razorpay_payment_id,
-                "razorpay_signature": request.razorpay_signature,
-            })
+            client.utility.verify_payment_signature(
+                {
+                    "razorpay_order_id": verification_data.razorpay_order_id,
+                    "razorpay_payment_id": verification_data.razorpay_payment_id,
+                    "razorpay_signature": verification_data.razorpay_signature,
+                }
+            )
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid payment signature")
     else:
@@ -181,20 +188,27 @@ async def verify_payment(verification_data: VerifyPaymentRequest, request: Reque
         if os.getenv("APP_MODE") == "production":
             raise HTTPException(status_code=500, detail="Razorpay is not fully configured for production.")
         # Simulated verification
-        if not request.razorpay_signature:
+        if not verification_data.razorpay_signature:
             raise HTTPException(status_code=400, detail="Missing signature")
 
     # Upgrade user tier in database
     try:
         from db.connection import execute_query
 
-        plan = PLANS[request.plan_id]
+        plan = PLANS[verification_data.plan_id]
 
         # Record payment
         await execute_query(
             """INSERT INTO payment_history (user_id, razorpay_payment_id, razorpay_order_id, amount_paise, currency, status, tier)
                VALUES (?, ?, ?, ?, ?, 'captured', ?)""",
-            (user_id, verification_data.razorpay_payment_id, verification_data.razorpay_order_id, plan["amount"], plan["currency"], verification_data.plan_id),
+            (
+                user_id,
+                verification_data.razorpay_payment_id,
+                verification_data.razorpay_order_id,
+                plan["amount"],
+                plan["currency"],
+                verification_data.plan_id,
+            ),
         )
 
         # Upgrade subscription (Reliable upsert since user_id is not inherently UNIQUE in schema)
@@ -209,13 +223,13 @@ async def verify_payment(verification_data: VerifyPaymentRequest, request: Reque
                      current_period_end = datetime('now', '+30 days'),
                      updated_at = CURRENT_TIMESTAMP
                    WHERE user_id = ?""",
-                (verification_data.plan_id, verification_data.razorpay_payment_id, user_id)
+                (verification_data.plan_id, verification_data.razorpay_payment_id, user_id),
             )
         else:
             await execute_query(
                 """INSERT INTO subscriptions (user_id, tier, razorpay_subscription_id, status, current_period_start, current_period_end)
                    VALUES (?, ?, ?, 'active', datetime('now'), datetime('now', '+30 days'))""",
-                (user_id, verification_data.plan_id, verification_data.razorpay_payment_id)
+                (user_id, verification_data.plan_id, verification_data.razorpay_payment_id),
             )
 
         # Update user tier
@@ -243,7 +257,7 @@ async def verify_payment(verification_data: VerifyPaymentRequest, request: Reque
         raise HTTPException(
             status_code=500,
             detail="Payment captured but account upgrade pending. Our team has been notified. "
-                   f"Contact support with payment ID: {verification_data.razorpay_payment_id}",
+            f"Contact support with payment ID: {verification_data.razorpay_payment_id}",
         )
 
     return {
@@ -256,7 +270,7 @@ async def verify_payment(verification_data: VerifyPaymentRequest, request: Reque
 @router.post("/webhook")
 async def razorpay_webhook(http_request: Request):
     """Handle Razorpay webhook events (subscription lifecycle).
-    
+
     Security: Idempotency guard prevents replay attacks.
     A replayed event_id returns 200 OK immediately without re-processing.
     """
@@ -278,18 +292,29 @@ async def razorpay_webhook(http_request: Request):
 
     try:
         import json
+
         event = json.loads(body.decode("utf-8"))
         event_type = event.get("event", "")
-        event_id = event.get("account_id", "") + ":" + event.get("event", "") + ":" + str(
-            event.get("payload", {}).get("payment", {}).get("entity", {}).get("id", 
-            event.get("payload", {}).get("subscription", {}).get("entity", {}).get("id", str(time.time())))
+        event_id = (
+            event.get("account_id", "")
+            + ":"
+            + event.get("event", "")
+            + ":"
+            + str(
+                event.get("payload", {})
+                .get("payment", {})
+                .get("entity", {})
+                .get(
+                    "id", event.get("payload", {}).get("subscription", {}).get("entity", {}).get("id", str(time.time()))
+                )
+            )
         )
 
         # --- Idempotency Check (Security Fix 1.2) ---
         if event_id in _processed_webhook_events:
             logger.info("payment.webhook_duplicate_skipped", event_id=event_id)
             return {"status": "ok", "duplicate": True}
-        
+
         # Mark as processed BEFORE acting (prevents race conditions)
         if len(_processed_webhook_events) >= _MAX_WEBHOOK_EVENTS:
             _processed_webhook_events.clear()
@@ -306,6 +331,7 @@ async def razorpay_webhook(http_request: Request):
             sub_id = entity.get("id")
             if sub_id:
                 from db.connection import execute_query
+
                 await execute_query(
                     "UPDATE subscriptions SET status = 'cancelled', updated_at = CURRENT_TIMESTAMP WHERE razorpay_subscription_id = ?",
                     (sub_id,),

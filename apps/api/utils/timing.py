@@ -7,14 +7,13 @@ from __future__ import annotations
 
 import time
 from contextlib import contextmanager
-from typing import Dict, Optional
 
 
 class RequestTimer:
     """Track execution time per-stage for any pipeline."""
 
     def __init__(self):
-        self.stages: Dict[str, float] = {}
+        self.stages: dict[str, float] = {}
         self._start_time = time.perf_counter()
 
     @contextmanager

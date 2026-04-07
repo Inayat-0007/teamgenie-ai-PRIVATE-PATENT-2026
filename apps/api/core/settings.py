@@ -7,15 +7,15 @@ Zero breaking changes — every existing feature defaults to its current behavio
 from __future__ import annotations
 
 import os
-from enum import Enum
+from enum import StrEnum
 from functools import lru_cache
-from typing import Optional
 
 
-class AppMode(str, Enum):
+class AppMode(StrEnum):
     """Three distinct runtime modes."""
-    DEMO = "demo"              # Sample data, no external deps, dev auth
-    HYBRID = "hybrid"          # Real DB maybe, fallback to heuristics
+
+    DEMO = "demo"  # Sample data, no external deps, dev auth
+    HYBRID = "hybrid"  # Real DB maybe, fallback to heuristics
     PRODUCTION = "production"  # All real, strict validation
 
 
@@ -45,28 +45,28 @@ class Settings:
 
     # --- LLM Provider Keys ---
     @property
-    def GEMINI_API_KEY(self) -> Optional[str]:
+    def GEMINI_API_KEY(self) -> str | None:
         v = os.getenv("GEMINI_API_KEY", "")
         return v if v and not v.startswith("AIzaSyXXXX") else None
 
     @property
-    def CLAUDE_API_KEY(self) -> Optional[str]:
+    def CLAUDE_API_KEY(self) -> str | None:
         v = os.getenv("CLAUDE_API_KEY", "")
         return v if v and v != "your_anthropic_key_here" else None
 
     # --- Databases ---
     @property
-    def TURSO_DATABASE_URL(self) -> Optional[str]:
+    def TURSO_DATABASE_URL(self) -> str | None:
         v = os.getenv("TURSO_DATABASE_URL", "")
         return v if v and "XXXXX" not in v else None
 
     @property
-    def UPSTASH_REDIS_URL(self) -> Optional[str]:
+    def UPSTASH_REDIS_URL(self) -> str | None:
         v = os.getenv("UPSTASH_REDIS_URL", "")
         return v if v and "xxxxx" not in v else None
 
     @property
-    def PINECONE_API_KEY(self) -> Optional[str]:
+    def PINECONE_API_KEY(self) -> str | None:
         v = os.getenv("PINECONE_API_KEY", "")
         return v if v and "xxxx" not in v else None
 
