@@ -47,7 +47,7 @@ except ImportError:
     sentry_sdk = None  # type: ignore[assignment]
     logger.warning("sentry.unavailable", reason="sentry_sdk package not installed — error tracking disabled")
 
-from routers import auth, match, player, team, user, payment
+from routers import auth, match, player, team, user, payment, admin
 
 # ---------------------------------------------------------------------------
 # Metrics — prometheus_client middleware + /metrics endpoint (issue #3/#9 fix)
@@ -248,6 +248,7 @@ app.include_router(player.router, prefix="/api/player", tags=["Player Insights"]
 app.include_router(match.router, prefix="/api/match", tags=["Match Data"])
 app.include_router(user.router, prefix="/api/user", tags=["User Management"])
 app.include_router(payment.router, prefix="/api/payment", tags=["Payments"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Administration"])
 
 # /metrics — prefer the prometheus_client (generate_latest) version; fall back to in-memory
 if _metrics_middleware_available and metrics_endpoint is not None:

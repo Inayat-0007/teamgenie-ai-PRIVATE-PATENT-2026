@@ -21,4 +21,4 @@ CREATE INDEX IF NOT EXISTS idx_payment_history_user_id ON payment_history(user_i
 CREATE INDEX IF NOT EXISTS idx_daily_usage_user_date ON daily_usage(user_id, usage_date);
 
 -- Intelligence cache: queried by match_id during team generation
-CREATE INDEX IF NOT EXISTS idx_intelligence_match ON intelligence_cache(match_id);
+CREATE INDEX IF NOT EXISTS idx_intelligence_match ON match_intelligence(match_id);

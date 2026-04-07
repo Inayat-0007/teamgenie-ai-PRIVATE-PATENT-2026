@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Zap, Terminal, Loader2, CreditCard, Shield, IndianRupee } from "lucide-react";
+import Script from "next/script";
+import { aiKit } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 
 const TIERS = [
   {
@@ -20,7 +23,7 @@ const TIERS = [
     ],
     disabledFeatures: [
       "Live Toss Intelligence",
-      "Live ScoutFeed\u2122 Reasoning",
+      "Live ScoutFeed™ Reasoning",
       "Differential Expert Mode",
       "Elite Bloomberg Terminal",
     ],
@@ -37,7 +40,7 @@ const TIERS = [
     features: [
       "3 AI Generations per day",
       "Live Toss Intelligence Engine",
-      "Live ScoutFeed\u2122 Reasoning",
+      "Live ScoutFeed™ Reasoning",
       "Google OR-Tools Math Engine",
       "Risk Profile Configuration (Safe/Aggressive)",
     ],
@@ -68,25 +71,80 @@ const TIERS = [
   }
 ];
 
+// Extend window for Razorpay
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
+
 export default function PricingPage() {
   const [loadingTier, setLoadingTier] = useState<string | null>(null);
-  const [showSimulatedModal, setShowSimulatedModal] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
-  const handleUpgrade = (tierId: string) => {
+  const handleUpgrade = async (tierId: string) => {
     if (tierId === "free") return;
     setLoadingTier(tierId);
     
-    // Simulate Razorpay initialization delay
-    setTimeout(() => {
+    try {
+      // 1. Create order on backend
+      const order = await aiKit.createOrder(tierId as "pro" | "elite");
+      
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // 2. Configure Razorpay
+      const options = {
+        key: order.key_id, 
+        amount: order.amount,
+        currency: order.currency,
+        name: "TeamGenie AI",
+        description: `Upgrade to ${tierId.toUpperCase()} Tier`,
+        image: "/logo.png",
+        order_id: order.order_id,
+        handler: async function (response: any) {
+          try {
+             setLoadingTier(tierId); // Show loader during verification
+             await aiKit.verifyPayment({
+               razorpay_order_id: response.razorpay_order_id,
+               razorpay_payment_id: response.razorpay_payment_id,
+               razorpay_signature: response.razorpay_signature,
+               plan_id: tierId
+             });
+             alert("Subscription upgraded successfully!");
+             window.location.href = "/dashboard";
+          } catch (err) {
+             console.error("Verification failed:", err);
+             alert("Payment verified but account update failed. Contact support.");
+          } finally {
+             setLoadingTier(null);
+          }
+        },
+        prefill: {
+          name: user?.user_metadata?.full_name || "",
+          email: user?.email || "",
+        },
+        theme: {
+          color: "#10b981", // Emerald 500
+        },
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', function (response: any) {
+         console.error("Payment failed:", response.error);
+         alert(`Payment failed: ${response.error.description}`);
+         setLoadingTier(null);
+      });
+      rzp.open();
+    } catch (e) {
+      console.error("Payment Init Error:", e);
+      alert("Failed to initialize payment. Try again later.");
+    } finally {
       setLoadingTier(null);
-      setSelectedPlan(tierId);
-      setShowSimulatedModal(true);
-    }, 1200);
+    }
   };
 
   return (
     <div className="min-h-screen bg-[#050505] text-white py-24 selection:bg-emerald-500/30">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" />
       
       {/* Background Ambience */}
       <div className="fixed inset-0 pointer-events-none opacity-20">
@@ -180,117 +238,6 @@ export default function PricingPage() {
           ))}
         </div>
       </div>
-
-      {/* Simulated Razorpay Modal */}
-      <AnimatePresence>
-        {showSimulatedModal && (
-          <>
-            {/* Backdrop */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-              onClick={() => setShowSimulatedModal(false)}
-            >
-              {/* Modal window */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                onClick={(e) => e.stopPropagation()}
-                className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl shadow-emerald-900/10 flex flex-col"
-              >
-                {/* Header (Razorpay Style) */}
-                <div className="bg-gradient-to-r from-emerald-600 to-blue-600 p-6 text-center shadow-inner relative">
-                  <button 
-                    onClick={() => setShowSimulatedModal(false)}
-                    className="absolute top-4 right-4 text-white/70 hover:text-white"
-                  >
-                    \u2715
-                  </button>
-                  <div className="w-16 h-16 bg-white rounded-xl shadow-md mx-auto mb-4 flex items-center justify-center">
-                    <Shield className="w-8 h-8 text-emerald-600" />
-                  </div>
-                  <h2 className="text-xl font-bold text-white mb-1">TeamGenie AI Checkout</h2>
-                  <p className="text-emerald-100/80 text-sm">
-                    {selectedPlan === 'pro' ? 'Pro Strategist Tier' : 'Elite Whale Terminal'}
-                  </p>
-                </div>
-
-                {/* Body */}
-                <div className="p-6">
-                  <div className="flex justify-between items-center mb-6 pb-6 border-b border-white/5">
-                    <span className="text-gray-400">Total Amount Payable</span>
-                    <span className="text-3xl font-black text-white flex items-center">
-                      <IndianRupee className="w-6 h-6 mr-1" />
-                      {selectedPlan === 'pro' ? '199' : '999'}
-                    </span>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h4 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-2">Simulated Gateway</h4>
-                    
-                    <button 
-                      onClick={() => {
-                        alert(`Success! Handled by simulated Razorpay. Tier upgraded to ${selectedPlan!.toUpperCase()}`);
-                        setShowSimulatedModal(false);
-                      }}
-                      className="w-full bg-white/5 hover:bg-white/10 border border-white/10 p-4 rounded-xl flex items-center justify-between transition-colors group"
-                    >
-                      <div className="flex items-center text-gray-200">
-                        <CreditCard className="w-6 h-6 mr-3 text-emerald-400" />
-                        Credit / Debit Card
-                      </div>
-                      <ChevronRight />
-                    </button>
-
-                    <button 
-                      onClick={() => {
-                        alert(`UPI Success! Handled by simulated Razorpay.`);
-                        setShowSimulatedModal(false);
-                      }}
-                      className="w-full bg-white/5 hover:bg-white/10 border border-white/10 p-4 rounded-xl flex items-center justify-between transition-colors group"
-                    >
-                      <div className="flex items-center text-gray-200">
-                        <ScanBarcode className="w-6 h-6 mr-3 text-blue-400" />
-                        UPI / QR Code
-                      </div>
-                      <ChevronRight />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div className="bg-black/40 p-4 text-center">
-                  <span className="text-xs text-gray-500 inline-flex items-center">
-                    <Shield className="w-3 h-3 mr-1" />
-                    Secured by Razorpay Test API
-                  </span>
-                </div>
-              </motion.div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
-
     </div>
   );
-}
-
-// Icons
-function ChevronRight() {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500 group-hover:text-emerald-400 transition-colors">
-      <path d="m9 18 6-6-6-6"/>
-    </svg>
-  )
-}
-
-function ScanBarcode({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><rect width="7" height="5" x="7" y="7" rx="1"/><rect width="7" height="5" x="7" y="12" rx="1"/><path d="M17 7v10"/>
-    </svg>
-  )
 }

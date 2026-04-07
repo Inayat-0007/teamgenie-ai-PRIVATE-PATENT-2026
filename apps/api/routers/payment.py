@@ -115,9 +115,9 @@ def _verify_signature(order_id: str, payment_id: str, signature: str) -> bool:
 # ---------------------------------------------------------------------------
 
 @router.post("/create-order")
-async def create_order(request: CreateOrderRequest, http_request: Request):
+async def create_order(order_data: CreateOrderRequest, request: Request):
     """Create a Razorpay order for subscription upgrade."""
-    plan = PLANS.get(request.plan_id)
+    plan = PLANS.get(order_data.plan_id)
     if not plan:
         raise HTTPException(status_code=400, detail="Invalid plan")
 
@@ -138,20 +138,20 @@ async def create_order(request: CreateOrderRequest, http_request: Request):
         order = client.order.create({
             "amount": plan["amount"],
             "currency": plan["currency"],
-            "receipt": f"tg_{request.plan_id}_{int(time.time())}",
+            "receipt": f"tg_{order_data.plan_id}_{int(time.time())}",
             "notes": {
-                "plan": request.plan_id,
-                "user_id": getattr(http_request.state, "user_id", "unknown"),
+                "plan": order_data.plan_id,
+                "user_id": getattr(request.state, "user_id", "unknown"),
             },
         })
 
-        logger.info("payment.order_created", order_id=order["id"], plan=request.plan_id)
+        logger.info("payment.order_created", order_id=order["id"], plan=order_data.plan_id)
 
         return {
             "order_id": order["id"],
             "amount": plan["amount"],
             "currency": plan["currency"],
-            "plan": request.plan_id,
+            "plan": order_data.plan_id,
             "key_id": os.getenv("RAZORPAY_KEY_ID"),
             "simulated": False,
         }
@@ -161,9 +161,9 @@ async def create_order(request: CreateOrderRequest, http_request: Request):
 
 
 @router.post("/verify")
-async def verify_payment(request: VerifyPaymentRequest, http_request: Request):
+async def verify_payment(verification_data: VerifyPaymentRequest, request: Request):
     """Verify Razorpay payment and upgrade user tier."""
-    user_id = getattr(http_request.state, "user_id", "unknown")
+    user_id = getattr(request.state, "user_id", "unknown")
 
     # Verify signature
     client = _get_razorpay_client()
@@ -194,7 +194,7 @@ async def verify_payment(request: VerifyPaymentRequest, http_request: Request):
         await execute_query(
             """INSERT INTO payment_history (user_id, razorpay_payment_id, razorpay_order_id, amount_paise, currency, status, tier)
                VALUES (?, ?, ?, ?, ?, 'captured', ?)""",
-            (user_id, request.razorpay_payment_id, request.razorpay_order_id, plan["amount"], plan["currency"], request.plan_id),
+            (user_id, verification_data.razorpay_payment_id, verification_data.razorpay_order_id, plan["amount"], plan["currency"], verification_data.plan_id),
         )
 
         # Upgrade subscription (Reliable upsert since user_id is not inherently UNIQUE in schema)
@@ -209,23 +209,25 @@ async def verify_payment(request: VerifyPaymentRequest, http_request: Request):
                      current_period_end = datetime('now', '+30 days'),
                      updated_at = CURRENT_TIMESTAMP
                    WHERE user_id = ?""",
-                (request.plan_id, request.razorpay_payment_id, user_id)
+                (verification_data.plan_id, verification_data.razorpay_payment_id, user_id)
             )
         else:
             await execute_query(
                 """INSERT INTO subscriptions (user_id, tier, razorpay_subscription_id, status, current_period_start, current_period_end)
                    VALUES (?, ?, ?, 'active', datetime('now'), datetime('now', '+30 days'))""",
-                (user_id, request.plan_id, request.razorpay_payment_id)
+                (user_id, verification_data.plan_id, verification_data.razorpay_payment_id)
             )
 
         # Update user tier
         await execute_query(
             "UPDATE users SET tier = ? WHERE id = ?",
-            (request.plan_id, user_id),
+            (verification_data.plan_id, user_id),
         )
 
-        logger.info("payment.verified_upgrade", user_id=user_id, plan=request.plan_id)
+        logger.info("payment.verified_upgrade", user_id=user_id, plan=verification_data.plan_id)
 
+    except HTTPException:
+        raise
     except Exception as exc:
         # Audit Fix #05 CRITICAL: Payment verified but DB failed.
         # MUST return error so user knows upgrade is pending reconciliation.
@@ -233,21 +235,21 @@ async def verify_payment(request: VerifyPaymentRequest, http_request: Request):
         logger.error(
             "payment.db_update_failed_post_capture",
             user_id=user_id,
-            plan=request.plan_id,
-            payment_id=request.razorpay_payment_id,
-            order_id=request.razorpay_order_id,
+            plan=verification_data.plan_id,
+            payment_id=verification_data.razorpay_payment_id,
+            order_id=verification_data.razorpay_order_id,
             error=str(exc),
         )
         raise HTTPException(
             status_code=500,
             detail="Payment captured but account upgrade pending. Our team has been notified. "
-                   f"Contact support with payment ID: {request.razorpay_payment_id}",
+                   f"Contact support with payment ID: {verification_data.razorpay_payment_id}",
         )
 
     return {
         "status": "success",
-        "plan": request.plan_id,
-        "message": f"Successfully upgraded to {PLANS[request.plan_id]['name']}!",
+        "plan": verification_data.plan_id,
+        "message": f"Successfully upgraded to {PLANS[verification_data.plan_id]['name']}!",
     }
 
 
@@ -318,9 +320,9 @@ async def razorpay_webhook(http_request: Request):
 
 
 @router.get("/status")
-async def payment_status(http_request: Request):
+async def payment_status(request: Request):
     """Get current subscription status for authenticated user."""
-    user_id = getattr(http_request.state, "user_id", "unknown")
+    user_id = getattr(request.state, "user_id", "unknown")
 
     try:
         from db.connection import execute_query
