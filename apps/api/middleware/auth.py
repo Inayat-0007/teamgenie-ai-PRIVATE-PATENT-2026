@@ -241,14 +241,22 @@ async def verify_jwt(request: Request, call_next):
         error_msg = str(exc)
         # MASTER LEVEL LOGGING: Identify Mismatch
         logger.warning(
-            "auth.invalid_token", 
+            "auth.invalid_token",
             error=error_msg,
             token_sample=token[:10] + "...",
             reason="Likely SUPABASE_JWT_SECRET mismatch in .env vs Supabase Dashboard"
         )
+
+        # Security Fix: Only expose detailed hint in development
+        is_dev = os.getenv("PYTHON_ENV", "development") != "production"
+        if is_dev:
+            detail_msg = f"Auth Error: {error_msg}. ACTION: Ensure SUPABASE_JWT_SECRET in .env matches the one in your Supabase Dashboard -> Settings -> API."
+        else:
+            detail_msg = "Invalid authentication credentials"
+
         raise HTTPException(
-            status_code=401, 
-            detail=f"Auth Error: {error_msg}. ACTION: Ensure SUPABASE_JWT_SECRET in .env matches the one in your Supabase Dashboard -> Settings -> API."
+            status_code=401,
+            detail=detail_msg
         )
 
     return await call_next(request)

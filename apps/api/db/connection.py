@@ -40,6 +40,7 @@ except ImportError:
 # Module-level singleton to avoid per-query connection churn
 _turso_client = None
 _turso_client_failed = False
+_supabase_client = None
 
 
 @retry(**_RETRY_KWARGS)
@@ -70,7 +71,16 @@ async def get_turso_client():
 
 @retry(**_RETRY_KWARGS)
 def get_supabase_client():
-    """Get Supabase client with retry."""
+    """Get Supabase client with retry — singleton to prevent connection churn.
+
+    Audit Fix #5: Previously created a new client on every call, wasting
+    TCP/TLS connections on every auth operation. Now cached like Turso.
+    """
+    global _supabase_client
+
+    if _supabase_client is not None:
+        return _supabase_client
+
     from supabase import create_client
 
     url = os.getenv("SUPABASE_URL")
@@ -79,7 +89,9 @@ def get_supabase_client():
     if not url or not key:
         raise EnvironmentError("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must be set")
 
-    return create_client(url, key)
+    _supabase_client = create_client(url, key)
+    logger.debug("supabase.connected", url=url[:30] + "...")
+    return _supabase_client
 
 
 @retry(**_RETRY_KWARGS)

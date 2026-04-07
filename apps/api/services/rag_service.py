@@ -28,6 +28,27 @@ class RAGService:
         self.cohere_api_key = os.getenv("COHERE_API_KEY")
         self.tavily_api_key = os.getenv("TAVILY_API_KEY")
 
+        # Audit Fix #8: Cache model instances at init to avoid repeated instantiation
+        self._gemini_model = None
+        self._cohere_client = None
+
+        # Initialize Gemini model if API key is available
+        if self.gemini_api_key:
+            try:
+                import google.generativeai as genai
+                genai.configure(api_key=self.gemini_api_key)
+                self._gemini_model = genai.GenerativeModel("gemini-2.0-flash")
+            except Exception as e:
+                logger.warning("rag.gemini_init_failed", error=str(e))
+
+        # Initialize Cohere client if API key is available
+        if self.cohere_api_key:
+            try:
+                import cohere
+                self._cohere_client = cohere.Client(self.cohere_api_key)
+            except Exception as e:
+                logger.warning("rag.cohere_init_failed", error=str(e))
+
     async def query(self, question: str, k: int = 5) -> dict[str, Any]:
         """
         Full RAG pipeline:
@@ -82,16 +103,12 @@ class RAGService:
 
     async def _expand_query(self, query: str) -> str:
         """Use Gemini to expand query with cricket domain context."""
-        if not self.gemini_api_key:
+        if not self._gemini_model:
             return query
-            
+
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=self.gemini_api_key)
-            model = genai.GenerativeModel("gemini-2.5-flash")
-            
             prompt = f"Expand the following fantasy sports query into 2-3 targeted search keywords or short sentences focusing on recent form, pitch behavior, and match-ups: '{query}'"
-            response = await asyncio.to_thread(model.generate_content, prompt)
+            response = await asyncio.to_thread(self._gemini_model.generate_content, prompt)
             return response.text if response.text else query
         except Exception as e:
             logger.warning("rag.expand_failed", error=str(e))
@@ -237,17 +254,15 @@ class RAGService:
         if not docs:
             return []
         try:
-            if self.cohere_api_key:
-                import cohere
-                co = cohere.Client(self.cohere_api_key)
+            if self._cohere_client:
                 # Ensure docs have text for Cohere
                 doc_texts = [d.get("content", "") for d in docs]
                 # Fallback to sorting if texts are empty
                 if all(not t for t in doc_texts):
                     return sorted(docs, key=lambda d: d.get("score", 0), reverse=True)
-                    
-                response = await asyncio.to_thread(co.rerank, model="rerank-english-v2.0", query=query, documents=doc_texts, top_n=len(docs))
-                
+
+                response = await asyncio.to_thread(self._cohere_client.rerank, model="rerank-english-v2.0", query=query, documents=doc_texts, top_n=len(docs))
+
                 ranked_docs = []
                 for idx, result in enumerate(response.results):
                     original_doc = docs[result.index]
@@ -269,17 +284,13 @@ class RAGService:
             for d in context
             if d.get('content', '')  # Skip empty entries
         )
-        
-        if not self.gemini_api_key:
+
+        if not self._gemini_model:
              return f"DEMO ANALYSIS:\nBased on: \n{context_str}\n\nConclusion: Highly valuable fantasy asset."
-             
+
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=self.gemini_api_key)
-            model = genai.GenerativeModel("gemini-2.0-flash")
-            
             prompt = f"You are TeamGenie's expert fantasy sports analyst. Based on the following retrieved context, concisely answer the user's query.\n\nContext:\n{context_str}\n\nQuery: {question}\n\nProvide a bold, insightful, and data-driven summary in exactly one paragraph. Do not invent stats outside the context."
-            response = await asyncio.to_thread(model.generate_content, prompt)
+            response = await asyncio.to_thread(self._gemini_model.generate_content, prompt)
             return response.text if response.text else "Failed to generate analysis."
         except Exception as e:
             logger.warning("rag.generate_failed", error=str(e))

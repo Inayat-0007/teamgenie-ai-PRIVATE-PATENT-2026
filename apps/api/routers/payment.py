@@ -128,7 +128,7 @@ async def create_order(order_data: CreateOrderRequest, request: Request):
             "order_id": f"order_sim_{int(time.time())}",
             "amount": plan["amount"],
             "currency": plan["currency"],
-            "plan": request.plan_id,
+            "plan": order_data.plan_id,
             "key_id": os.getenv("RAZORPAY_KEY_ID", "rzp_test_simulated"),
             "simulated": True,
             "notes": "Razorpay not configured — simulated order for development",
@@ -170,9 +170,9 @@ async def verify_payment(verification_data: VerifyPaymentRequest, request: Reque
     if client:
         try:
             client.utility.verify_payment_signature({
-                "razorpay_order_id": request.razorpay_order_id,
-                "razorpay_payment_id": request.razorpay_payment_id,
-                "razorpay_signature": request.razorpay_signature,
+                "razorpay_order_id": verification_data.razorpay_order_id,
+                "razorpay_payment_id": verification_data.razorpay_payment_id,
+                "razorpay_signature": verification_data.razorpay_signature,
             })
         except Exception:
             raise HTTPException(status_code=400, detail="Invalid payment signature")
@@ -181,14 +181,14 @@ async def verify_payment(verification_data: VerifyPaymentRequest, request: Reque
         if os.getenv("APP_MODE") == "production":
             raise HTTPException(status_code=500, detail="Razorpay is not fully configured for production.")
         # Simulated verification
-        if not request.razorpay_signature:
+        if not verification_data.razorpay_signature:
             raise HTTPException(status_code=400, detail="Missing signature")
 
     # Upgrade user tier in database
     try:
         from db.connection import execute_query
 
-        plan = PLANS[request.plan_id]
+        plan = PLANS[verification_data.plan_id]
 
         # Record payment
         await execute_query(
