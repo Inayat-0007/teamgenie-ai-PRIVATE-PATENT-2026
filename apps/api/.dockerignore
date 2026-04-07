@@ -1,0 +1,51 @@
+# ============================================
+# TeamGenie AI — Docker Ignore
+# Prevents secrets, test files, and dev artifacts from shipping in images
+# ============================================
+
+# Environment files (CRITICAL — prevents credential leaks)
+.env
+.env.*
+!.env.example
+
+# Test & development files
+tests/
+test_*.py
+tmp_*.py
+clean_db.py
+pytest_output.txt
+pytest_results.txt
+test_output.txt
+status_output.txt
+pyproject.toml
+
+# Data files (audit logs, cached data)
+data/
+audit_log.jsonl
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+*.txt
+!requirements.txt

@@ -21,7 +21,7 @@ except ImportError:
     import logging
     logger = logging.getLogger(__name__)
 
-from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconnect, Request
 
 router = APIRouter()
 
@@ -133,8 +133,22 @@ async def harvester_status():
 
 
 @router.post("/harvester/trigger")
-async def trigger_harvest():
-    """Manually trigger a harvest cycle. Returns results when complete."""
+async def trigger_harvest(http_request: Request):
+    """Manually trigger a harvest cycle. Requires admin role.
+    
+    Audit Fix: Previously any authenticated user (including free tier) could trigger
+    harvests, causing 20+ DDG requests per trigger. Rate-abuse vector.
+    """
+    # Audit Fix: Admin role check
+    user_role = getattr(http_request.state, "user_role", "")
+    user_tier = getattr(http_request.state, "user_tier", "free")
+    if user_role != "admin" and user_tier != "elite":
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=403, 
+            detail="Harvester trigger requires admin role or elite tier"
+        )
+    
     try:
         from workers.harvester import run_harvest
         result = await run_harvest()
@@ -337,14 +351,39 @@ async def get_match_players(match_id: str):
 # ---------------------------------------------------------------------------
 
 @router.websocket("/{match_id}/ws")
-async def match_websocket(websocket: WebSocket, match_id: str):
+async def match_websocket(websocket: WebSocket, match_id: str, token: str = ""):
     """WebSocket for real-time match updates.
+    
+    Audit Fix: Browser WebSocket API cannot send Authorization headers.
+    Token is accepted as a query parameter: ws://host/api/match/{id}/ws?token=xxx
     
     Protocol:
       - Client sends "ping" → server replies "pong"
       - Server pushes live data from Redis every 15 seconds
       - Client can send "refresh" to force immediate data push
     """
+    # Validate token before accepting WebSocket connection
+    if token:
+        try:
+            import os
+            from jose import jwt as jwt_lib
+            secret = os.getenv("SUPABASE_JWT_SECRET", "")
+            algorithm = os.getenv("JWT_ALGORITHM", "HS256")
+            if secret:
+                payload = jwt_lib.decode(token, secret, algorithms=[algorithm])
+                # Token is valid — proceed
+                logger.debug("ws.authenticated", match_id=match_id, user=payload.get("sub"))
+        except Exception as e:
+            logger.warning("ws.auth_failed", match_id=match_id, error=str(e))
+            await websocket.close(code=4001, reason="Invalid authentication token")
+            return
+    else:
+        # Allow unauthenticated WS in development only
+        import os
+        if os.getenv("PYTHON_ENV") == "production":
+            await websocket.close(code=4001, reason="Authentication required")
+            return
+
     await manager.connect(websocket, match_id)
     
     # Background task to push Redis data periodically

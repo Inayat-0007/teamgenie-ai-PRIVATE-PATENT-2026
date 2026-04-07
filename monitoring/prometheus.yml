@@ -1,5 +1,6 @@
 # TeamGenie AI — Prometheus Monitoring
-# Scrape metrics from FastAPI + custom business metrics
+# Scrape metrics from FastAPI + Redis (actual infrastructure)
+# Audit Fix: Removed postgres-exporter and qdrant targets — platform uses Turso (SQLite) and Pinecone
 
 global:
   scrape_interval: 15s
@@ -30,12 +31,8 @@ scrape_configs:
           app: teamgenie
           component: cache
 
-  - job_name: "postgres"
-    static_configs:
-      - targets: ["postgres-exporter:9187"]
-        labels:
-          app: teamgenie
-          component: database
+  # Removed: postgres-exporter — platform uses Turso (SQLite-over-HTTP), not PostgreSQL.
+  # The PostgresDown alert fired immediately on every deploy because Postgres was never installed.
 
   - job_name: "node-exporter"
     static_configs:
@@ -44,10 +41,5 @@ scrape_configs:
           app: teamgenie
           component: infrastructure
 
-  - job_name: "qdrant"
-    static_configs:
-      - targets: ["qdrant:6333"]
-        labels:
-          app: teamgenie
-          component: vectordb
-    metrics_path: /metrics
+  # Removed: qdrant — platform uses Pinecone for vector search, not Qdrant.
+

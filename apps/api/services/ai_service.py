@@ -477,7 +477,7 @@ def _get_sample_players() -> list[dict[str, Any]]:
 
 
 async def _run_budget_optimizer(
-    players: list[dict], budget: float, preferences: Optional[dict] = None
+    players: list[dict], budget: float, preferences: Optional[dict] = None,
 ) -> dict:
     """
     Agent 1: Maximize points within budget.
@@ -501,18 +501,20 @@ async def _run_budget_optimizer(
         working_players.append(player)
 
     # Try OR-Tools ILP (Upgrade #7)
+    # Audit Fix #04 CRITICAL: Both solvers are CPU-bound and MUST run in a thread
+    # to avoid blocking the asyncio event loop (which freezes ALL concurrent requests).
     solver_used = "greedy-heuristic"
     try:
         from ortools.linear_solver import pywraplp
-        selected, total_cost, total_points = _solve_ilp(working_players, budget)
+        selected, total_cost, total_points = await asyncio.to_thread(_solve_ilp, working_players, budget)
         solver_used = "or-tools-ilp"
     except ImportError:
         # Graceful fallback to greedy
-        selected, total_cost, total_points = _solve_greedy(working_players, budget)
+        selected, total_cost, total_points = await asyncio.to_thread(_solve_greedy, working_players, budget)
     except RuntimeError as exc:
         # ILP solver found no optimal solution — fallback
         logger.warning("ilp.no_optimal_solution", error=str(exc))
-        selected, total_cost, total_points = _solve_greedy(working_players, budget)
+        selected, total_cost, total_points = await asyncio.to_thread(_solve_greedy, working_players, budget)
         solver_used = "greedy-heuristic-after-ilp-fail"
 
     # Validate solver output
@@ -539,7 +541,7 @@ async def _run_budget_optimizer(
     if total_cost > budget:
         logger.error("solver.budget_exceeded", cost=total_cost, budget=budget, solver=solver_used)
         # Re-run greedy with strict budget (guaranteed safe)
-        selected, total_cost, total_points = _solve_greedy(working_players, budget)
+        selected, total_cost, total_points = await asyncio.to_thread(_solve_greedy, working_players, budget)
         solver_used = "greedy-heuristic-budget-fix"
 
     return {

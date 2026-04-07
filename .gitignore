@@ -104,3 +104,13 @@ secrets/
 *.bak
 *.tmp
 tmp/
+
+# ---------- Audit Fix: Committed Data Files ----------
+# Prevents session data, test output, and audit logs from being tracked
+**/audit_log.jsonl
+**/data/audit_log.jsonl
+pytest_output.txt
+pytest_results.txt
+test_output.txt
+status_output.txt
+tmp_*.py

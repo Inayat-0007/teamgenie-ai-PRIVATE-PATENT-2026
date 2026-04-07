@@ -42,7 +42,7 @@ PUBLIC_ROUTES: frozenset[str] = frozenset({
     "/docs",
     "/redoc",
     "/openapi.json",
-    "/metrics",
+    # "/metrics" — REMOVED: must require auth to prevent competitor scraping (Audit Fix #09)
     "/api/auth/login",
     "/api/auth/register",
     "/api/auth/forgot-password",
@@ -88,8 +88,14 @@ async def revoke_token(token_jti: str) -> None:
     """Add a token's JTI to the revocation list (Redis-first, in-memory fallback)."""
     # Always add to in-memory as a local fast-check layer
     if len(_revoked_tokens) >= _MAX_REVOCATION_LIST_SIZE:
-        _revoked_tokens.clear()
-        logger.warning("auth.revocation_list_reset", reason="max_size_exceeded")
+        # Audit Fix #10: LRU eviction instead of .clear() which re-validated ALL logged-out users
+        # Remove oldest 20% of entries instead of wiping everything
+        evict_count = _MAX_REVOCATION_LIST_SIZE // 5
+        evict_iter = iter(_revoked_tokens)
+        to_remove = [next(evict_iter) for _ in range(min(evict_count, len(_revoked_tokens)))]
+        for old_jti in to_remove:
+            _revoked_tokens.discard(old_jti)
+        logger.warning("auth.revocation_list_evicted", evicted=len(to_remove), remaining=len(_revoked_tokens))
     _revoked_tokens.add(token_jti)
 
     # Persist to Redis so revocation survives pod restarts and works across replicas
@@ -178,20 +184,13 @@ async def verify_jwt(request: Request, call_next):
             logger.error("auth.jwt_secret_missing")
             raise HTTPException(status_code=500, detail="JWT secret not configured")
 
+        # Audit Fix #02 CRITICAL: Algorithm is ALWAYS server-controlled.
+        # NEVER read 'alg' from the token header — that's attacker-controlled data.
+        # This was a textbook OWASP JWT Algorithm Confusion vulnerability.
         algorithm = os.getenv("JWT_ALGORITHM", "HS256")
-        
-        # MASTER LEVEL: Peek at the header to see what algorithm Supabase is actually using
-        try:
-            unverified_header = jwt.get_unverified_header(token)
-            token_algo = unverified_header.get("alg")
-            if token_algo and token_algo != algorithm:
-                logger.info("auth.algorithm_detected", expected=algorithm, got=token_algo)
-                algorithm = token_algo
-        except Exception:
-            pass
 
-        # Validate algorithms — only allow known safe algorithms
-        allowed_algorithms = {"HS256", "HS384", "HS512", "RS256", "RS384", "RS512", "ES256"}
+        # Validate algorithms — only allow known safe symmetric algorithms for Supabase
+        allowed_algorithms = {"HS256", "HS384", "HS512"}
         if algorithm not in allowed_algorithms:
             logger.error("auth.unsafe_algorithm", algorithm=algorithm)
             raise HTTPException(status_code=500, detail=f"Unsafe JWT algorithm: {algorithm}")

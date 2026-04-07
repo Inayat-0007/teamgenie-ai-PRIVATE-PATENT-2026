@@ -44,14 +44,14 @@ jobs:
           uv pip install --system black ruff
 
       - name: Lint (Ruff — fast)
-        run: ruff check . || true
+        run: ruff check .
 
       - name: Format check (Black)
-        run: black --check --diff . || true
+        run: black --check --diff .
 
       - name: Type check (mypy)
         continue-on-error: true
-        run: mypy . --ignore-missing-imports --no-error-summary || true
+        run: mypy . --ignore-missing-imports --no-error-summary
 
       - name: Test
         env:
@@ -111,20 +111,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Audit Fix #08: Removed || true — CVEs now actually fail the build
       - name: Python dependency audit
         run: |
           pip install pip-audit
-          pip-audit -r apps/api/requirements.txt --desc || true
+          pip-audit -r apps/api/requirements.txt --desc
 
+      # Audit Fix #08: Removed || true — npm vulnerabilities now fail CI
       - name: Node dependency audit
         run: |
           cd apps/web
-          npm audit --omit=dev || true
+          npm audit --omit=dev
 
+      # Audit Fix: Removed --only-verified so rotated credentials in git history are detected
       - name: Secret scanning
         uses: trufflesecurity/trufflehog@main
-        with:
-          extra_args: --only-verified
 
   # ==========================================
   # Docker Build (validate Dockerfile)

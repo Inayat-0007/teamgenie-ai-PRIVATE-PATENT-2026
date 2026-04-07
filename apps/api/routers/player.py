@@ -19,7 +19,7 @@ router = APIRouter()
 
 @router.get("/search")
 async def search_players(
-    q: str = Query(..., min_length=2, max_length=200, description="Search query"),
+    q: str = Query(..., min_length=1, max_length=200, description="Search query"),
     role: Optional[str] = Query(default=None, pattern="^(batsman|bowler|all_rounder|wicket_keeper)$"),
     team: Optional[str] = None,
     limit: int = Query(default=20, ge=1, le=100),
@@ -29,9 +29,22 @@ async def search_players(
     
     try:
         # Full-Text Search (FTS5) logic if implemented in Turso
-        query = "SELECT id, name, role, team FROM players WHERE name LIKE ? LIMIT ?"
+        query = "SELECT id, name, role, team, form_score, predicted_points, ownership_pct FROM players WHERE name LIKE ? LIMIT ?"
         rows = await execute_query(query, (f"%{q}%", limit))
-        players = [{"id": r[0], "name": r[1], "role": r[2], "team": r[3]} for r in rows]
+        players = []
+        for r in rows:
+            p_id, name, role, team, form, expected, ownership = r
+            players.append({
+                "id": p_id,
+                "name": name,
+                "role": role,
+                "team": team,
+                "form": round(float(form or 7.0) / 10, 1) if float(form or 0) > 10 else float(form or 7.0),
+                "expected": round(float(expected or 0), 1),
+                "floor": round(float(expected or 0) * 0.7, 1),
+                "ceiling": round(float(expected or 0) * 1.3, 2),
+                "ownership": round(float(ownership or 0), 1)
+            })
         if players:
             return {"players": players, "total": len(players), "query": q}
     except Exception as e:
@@ -39,10 +52,10 @@ async def search_players(
         
     # Production Fallback Mock
     mock_players = [
-        {"id": "v_kohli", "name": "Virat Kohli", "role": "batsman", "team": "RCB"},
-        {"id": "r_sharma", "name": "Rohit Sharma", "role": "batsman", "team": "MI"},
-        {"id": "j_bumrah", "name": "Jasprit Bumrah", "role": "bowler", "team": "MI"},
-        {"id": "r_jadeja", "name": "Ravindra Jadeja", "role": "all_rounder", "team": "CSK"}
+        {"id": "v_kohli", "name": "Virat Kohli", "role": "batsman", "team": "RCB", "form": 9.2, "expected": 88.5, "floor": 62, "ceiling": 115, "ownership": 88},
+        {"id": "r_sharma", "name": "Rohit Sharma", "role": "batsman", "team": "MI", "form": 8.5, "expected": 72.0, "floor": 45, "ceiling": 98, "ownership": 72},
+        {"id": "j_bumrah", "name": "Jasprit Bumrah", "role": "bowler", "team": "MI", "form": 9.8, "expected": 92.4, "floor": 70, "ceiling": 125, "ownership": 91},
+        {"id": "r_jadeja", "name": "Ravindra Jadeja", "role": "all_rounder", "team": "CSK", "form": 8.1, "expected": 68.0, "floor": 40, "ceiling": 88, "ownership": 65}
     ]
     # Filter mock data
     filtered = [p for p in mock_players if q.lower() in p["name"].lower()]

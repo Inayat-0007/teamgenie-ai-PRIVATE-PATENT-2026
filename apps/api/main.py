@@ -5,6 +5,7 @@ Production-grade async API with self-healing middleware.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 import uuid
@@ -262,12 +263,44 @@ elif metrics_router:
 # Health, Readiness & Diagnostics (Upgrade #3)
 # ---------------------------------------------------------------------------
 @app.get("/health", tags=["Health"])
-async def health_check():
+async def health_check(request: Request):
+    """Real health check — verifies critical dependencies are reachable.
+    
+    Audit Fix: Previously returned 200 unconditionally even when
+    Turso and Redis were both down. K8s had no idea the pod was broken.
+    """
+    checks = {}
+    overall_healthy = True
+
+    # Check Turso DB (500ms timeout)
+    try:
+        from db.connection import execute_query
+        await asyncio.wait_for(
+            execute_query("SELECT 1"),
+            timeout=0.5,
+        )
+        checks["database"] = "ok"
+    except Exception:
+        checks["database"] = "degraded"
+        # DB being down degrades but doesn't kill the pod (demo mode still works)
+
+    # Check Redis cache (500ms timeout)
+    try:
+        cache = getattr(request.app.state, "cache", None)
+        if cache and hasattr(cache, "ping"):
+            await asyncio.wait_for(cache.ping(), timeout=0.5)
+            checks["cache"] = "ok"
+        else:
+            checks["cache"] = "not_configured"
+    except Exception:
+        checks["cache"] = "degraded"
+
     return {
-        "status": "healthy",
+        "status": "healthy" if overall_healthy else "degraded",
         "version": API_VERSION,
         "service": "teamgenie-api",
         "timestamp": time.time(),
+        "checks": checks,
     }
 
 

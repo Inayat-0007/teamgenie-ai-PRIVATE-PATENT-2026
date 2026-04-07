@@ -152,7 +152,8 @@ class RAGService:
         docs = await self._query_pinecone_namespace(query, k, "player_stats")
         if docs:
             return docs
-        return [{"content": "Player trending stats indicating strong performance recently.", "score": 0.9, "source": "stub_player_stats"}]
+        # Audit Fix #07: Return empty when Pinecone unavailable — no fabricated stubs
+        return []
 
     async def _query_match_history(self, query: str, k: int) -> list[dict]:
         """Index 2: Historical match results from Pinecone (fallback to DDG)."""
@@ -167,7 +168,8 @@ class RAGService:
         except Exception as e:
             logger.warning("rag.match_history_search_failed", error=str(e))
         
-        return [{"content": "Match history indicates player excels against left-arm pace.", "score": 0.85, "source": "stub_match_history"}]
+        # Audit Fix #07: Return empty when no real data available — no fabricated stubs
+        return []
 
     async def _query_venue_data(self, query: str, k: int) -> list[dict]:
         """Index 3: Venue data from Pinecone (fallback to DDG search)."""
@@ -182,7 +184,8 @@ class RAGService:
         except Exception as e:
             logger.warning("rag.venue_search_failed", error=str(e))
         
-        return [{"content": "Venue data unavailable — using general cricket pitch analysis.", "score": 0.8, "source": "stub_venue_data"}]
+        # Audit Fix #07: Return empty when no real data available — no fabricated stubs
+        return []
 
     async def _query_news(self, query: str, k: int) -> list[dict]:
         """Index 4: Real-time cricket news from Pinecone (fallback to Tavily/DDG)."""
@@ -226,7 +229,8 @@ class RAGService:
         except Exception:
             pass
         
-        return [{"content": "No real-time news available for this query.", "score": 0.7, "source": "stub_news"}]
+        # Audit Fix #07: Return empty when no real news available — no fabricated stubs
+        return []
 
     async def _rerank(self, query: str, docs: list[dict]) -> list[dict]:
         """Re-rank documents using Cohere API (fallback: score-based sorting)."""
@@ -260,7 +264,11 @@ class RAGService:
         if not context:
             return "Insufficient data to generate analysis."
 
-        context_str = "\n".join(f"- {d.get('content', '')}" for d in context)
+        context_str = "\n".join(
+            f"- {d.get('content', '')[:300]}"  # Audit Fix: truncate each doc to 300 chars
+            for d in context
+            if d.get('content', '')  # Skip empty entries
+        )
         
         if not self.gemini_api_key:
              return f"DEMO ANALYSIS:\nBased on: \n{context_str}\n\nConclusion: Highly valuable fantasy asset."

@@ -93,11 +93,25 @@ _IP_BAN_WINDOW_SECONDS = 600  # 10 minute window
 
 
 def _get_client_ip(request: Request) -> str:
-    """Extract client IP, respecting X-Forwarded-For behind reverse proxy."""
-    forwarded = request.headers.get("X-Forwarded-For")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.client.host if request.client else "unknown"
+    """Extract client IP with X-Forwarded-For validation.
+    
+    Audit Fix: Previously blindly trusted X-Forwarded-For from any source.
+    Now only trusts the header when the direct connection is from a known proxy.
+    Attackers could set X-Forwarded-For: 127.0.0.1 to bypass IP bans.
+    """
+    # Only trust X-Forwarded-For if the direct connection is from a trusted proxy
+    trusted_proxies = set(
+        os.getenv("TRUSTED_PROXIES", "127.0.0.1,10.0.0.0/8").split(",")
+    )
+    direct_ip = request.client.host if request.client else "unknown"
+    
+    # If direct connection is from a known proxy, trust X-Forwarded-For
+    if direct_ip in trusted_proxies:
+        forwarded = request.headers.get("X-Forwarded-For")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+    
+    return direct_ip
 
 
 def _is_ip_banned(ip: str) -> bool:

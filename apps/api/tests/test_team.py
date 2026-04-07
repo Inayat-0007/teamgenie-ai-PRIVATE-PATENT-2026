@@ -419,7 +419,7 @@ def test_auth_public_routes():
     assert _is_public_route("/api/auth/register") is True
     assert _is_public_route("/api/auth/forgot-password") is True
     assert _is_public_route("/api/auth/refresh") is True
-    assert _is_public_route("/metrics") is True
+    assert _is_public_route("/api/payment/webhook") is True
 
     # Protected routes should NOT be public
     assert _is_public_route("/api/team/generate") is False

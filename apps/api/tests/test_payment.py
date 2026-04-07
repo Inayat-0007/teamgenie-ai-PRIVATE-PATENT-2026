@@ -95,7 +95,8 @@ def test_verify_payment_invalid_plan(client):
     assert response.status_code == 422
 
 
-def test_verify_payment_simulated_success(client):
+@patch("db.connection.execute_query", new_callable=AsyncMock)
+def test_verify_payment_simulated_success(mock_execute, client):
     """In test mode without Razorpay, simulated verification should work."""
     response = client.post("/api/payment/verify", json={
         "razorpay_order_id": "order_sim_123",

@@ -74,8 +74,13 @@ class SubscriptionService:
             rows = await execute_query(query, (user_id, modifier))
             current_count = rows[0][0] if rows and rows[0][0] is not None else 0
         except Exception as e:
+            # Audit Fix: Fail CLOSED when DB is unreachable — prevent unlimited free generations
+            # Previously: current_count = 0 (fail-open = unlimited generations during outage)
             logger.error("turso.quota_query_failed", user_id=user_id, error=str(e))
-            current_count = 0  # Fail open if DB is unreachable temporarily so UX isn't broken
+            raise Exception(
+                "Service temporarily unavailable. Please try again in a few moments. "
+                "Your generation quota could not be verified."
+            )
             
         if current_count >= limit:
             logger.warning(

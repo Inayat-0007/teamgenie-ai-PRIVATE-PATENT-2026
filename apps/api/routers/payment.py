@@ -227,9 +227,22 @@ async def verify_payment(request: VerifyPaymentRequest, http_request: Request):
         logger.info("payment.verified_upgrade", user_id=user_id, plan=request.plan_id)
 
     except Exception as exc:
-        logger.error("payment.db_update_failed", error=str(exc))
-        # Payment was verified but DB failed — log for manual reconciliation
-        # DO NOT return error to user, payment was already captured
+        # Audit Fix #05 CRITICAL: Payment verified but DB failed.
+        # MUST return error so user knows upgrade is pending reconciliation.
+        # Silently returning "success" when DB failed = user charged but not upgraded.
+        logger.error(
+            "payment.db_update_failed_post_capture",
+            user_id=user_id,
+            plan=request.plan_id,
+            payment_id=request.razorpay_payment_id,
+            order_id=request.razorpay_order_id,
+            error=str(exc),
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Payment captured but account upgrade pending. Our team has been notified. "
+                   f"Contact support with payment ID: {request.razorpay_payment_id}",
+        )
 
     return {
         "status": "success",
