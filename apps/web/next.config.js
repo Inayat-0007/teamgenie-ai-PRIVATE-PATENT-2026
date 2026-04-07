@@ -24,11 +24,11 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: https:",
-              "connect-src 'self' http://localhost:8000 ws://localhost:8000 https://api.teamgenie.app wss://api.teamgenie.app https://*.supabase.co https://*.posthog.com",
+              "img-src 'self' data: https: https://*.razorpay.com",
+              "connect-src 'self' http://localhost:8000 ws://localhost:8000 https://api.teamgenie.app wss://api.teamgenie.app https://*.supabase.co https://*.posthog.com https://api.razorpay.com https://lumberjack.razorpay.com",
             ].join('; '),
           },
           {

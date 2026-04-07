@@ -1,7 +1,0 @@
---- AGENT 0 STATUS CHECK (Turso DB) ---
-Matches stored: 7
-Intel records stored: 34
-Players stored: 120
-
---- AGENT 1 STATUS CHECK (Team Generator) ---
-Agent 1 Error: cannot import name 'team_generator' from 'services.ai_service' (C:\Users\moham\Music\DEPLOY V1 INAYAT\Gitlatestclone 4 march\teamgenie-ai-PRIVATE-PATENT-2026\apps\api\services\ai_service.py)

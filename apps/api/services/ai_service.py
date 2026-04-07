@@ -724,3 +724,7 @@ def _build_consensus_team(
         "predicted_total": budget_result.get("total_points", 0),
         "risk_score": risk_result.get("risk_score", 0.5),
     }
+
+# --- Public Aliases (Backward Compatibility) ---
+generate_team = generate_team_with_agents
+team_generator = generate_team_with_agents
