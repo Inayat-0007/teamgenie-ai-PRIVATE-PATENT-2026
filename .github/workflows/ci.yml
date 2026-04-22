@@ -112,10 +112,26 @@ jobs:
       - uses: actions/checkout@v4
 
       # Audit Fix #08: Removed || true — CVEs now actually fail the build
+      # Audit against the pre-compiled lock file (apps/api/requirements.lock.txt)
+      # to avoid pip's resolution-too-deep error on the large AI dependency tree.
+      # Regenerate lock file: uv pip compile apps/api/requirements.txt -o apps/api/requirements.lock.txt --python-version 3.11
+      #
+      # Acknowledged unfixable findings (--ignore-vuln):
+      #   CVE-2025-69872  diskcache: no upstream fix published yet.
+      #   GHSA-fv5p-p927-qmxr  langchain-text-splitters: fix is in v1.1.2 which requires the
+      #                         full langchain 1.x ecosystem upgrade (tracked separately).
+      #   CVE-2026-35029 / CVE-2026-35030 / GHSA-69x8-hrgq-fjj8  litellm: fix requires
+      #                         litellm>=1.83 which in turn requires openai>=2.x — a major
+      #                         breaking API change tracked separately.
       - name: Python dependency audit
         run: |
           pip install pip-audit
-          pip-audit -r apps/api/requirements.txt --desc
+          pip-audit -r apps/api/requirements.lock.txt --desc \
+            --ignore-vuln CVE-2025-69872 \
+            --ignore-vuln GHSA-fv5p-p927-qmxr \
+            --ignore-vuln CVE-2026-35029 \
+            --ignore-vuln CVE-2026-35030 \
+            --ignore-vuln GHSA-69x8-hrgq-fjj8
 
       # Audit Fix #08: Removed || true — npm vulnerabilities now fail CI.
       # next@14.2.35 fixes the critical auth-bypass (GHSA-f82v-jwr5-mffw).
