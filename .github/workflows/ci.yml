@@ -112,10 +112,13 @@ jobs:
       - uses: actions/checkout@v4
 
       # Audit Fix #08: Removed || true — CVEs now actually fail the build
+      # Audit against the pre-compiled lock file (apps/api/requirements.lock.txt)
+      # to avoid pip's resolution-too-deep error on the large AI dependency tree.
+      # Regenerate lock file: uv pip compile apps/api/requirements.txt -o apps/api/requirements.lock.txt --python-version 3.11
       - name: Python dependency audit
         run: |
           pip install pip-audit
-          pip-audit -r apps/api/requirements.txt --desc
+          pip-audit -r apps/api/requirements.lock.txt --desc
 
       # Audit Fix #08: Removed || true — npm vulnerabilities now fail CI.
       # next@14.2.35 fixes the critical auth-bypass (GHSA-f82v-jwr5-mffw).

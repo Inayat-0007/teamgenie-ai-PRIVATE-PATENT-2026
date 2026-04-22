@@ -27,7 +27,8 @@ except ImportError:
 from fastapi import HTTPException, Request
 
 try:
-    from jose import JWTError, jwt
+    import jwt
+    from jwt.exceptions import PyJWTError as JWTError
 except ImportError:
     jwt = None  # type: ignore[assignment]
     JWTError = Exception  # type: ignore[misc,assignment]
