@@ -13,7 +13,8 @@ python-dotenv>=1.0
 python-multipart>=0.0.6
 
 # --- Authentication ---
-python-jose[cryptography]>=3.3
+# PyJWT replaces python-jose: identical HS256/384/512 API, no ecdsa dependency (CVE-2025-69872)
+PyJWT[crypto]>=2.8,<3.0
 passlib[bcrypt]>=1.7
 httpx>=0.26,<1.0
 

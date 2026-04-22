@@ -411,7 +411,7 @@ async def match_websocket(websocket: WebSocket, match_id: str, token: str = ""):
         try:
             import os
 
-            from jose import jwt as jwt_lib
+            import jwt as jwt_lib
 
             secret = os.getenv("SUPABASE_JWT_SECRET", "")
             algorithm = os.getenv("JWT_ALGORITHM", "HS256")
